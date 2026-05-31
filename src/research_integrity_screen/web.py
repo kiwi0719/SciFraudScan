@@ -129,6 +129,12 @@ _HTML = """
       cursor: pointer;
     }
     button:disabled { opacity: .65; cursor: wait; }
+    details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+    summary { cursor: pointer; color: var(--brand); font-weight: 700; font-size: 13px; }
+    .hint { margin-top: 10px; font-size: 13px; }
+    .detected { padding: 14px 16px; margin-bottom: 14px; }
+    .detected h2 { margin: 0 0 8px; font-size: 16px; letter-spacing: 0; }
+    .detected ul { margin-top: 0; }
     .summary {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -171,25 +177,25 @@ _HTML = """
 <body>
   <header>
     <h1>SciFraudScan</h1>
-    <p>Upload research data and inspect statistical anomaly signals across duplication, structure, reported statistics, p-values, randomization, covariance, and time series.</p>
+    <p>Upload one CSV. SciFraudScan automatically detects numeric data, group columns, time columns, p-values, and reported statistics where possible.</p>
   </header>
   <main>
     <form id="scan-form" class="panel">
       <label for="data">Dataset CSV</label>
       <input id="data" name="data" type="file" accept=".csv,text/csv" required>
-      <label for="reported_stats">Reported statistics CSV</label>
-      <input id="reported_stats" name="reported_stats" type="file" accept=".csv,text/csv">
-      <label for="p_values">P-values CSV</label>
-      <input id="p_values" name="p_values" type="file" accept=".csv,text/csv">
-      <label for="group_column">Group column</label>
-      <input id="group_column" name="group_column" type="text" placeholder="e.g. treatment">
-      <label for="time_column">Time column</label>
-      <input id="time_column" name="time_column" type="text" placeholder="e.g. visit_date">
+      <p class="hint">No column mapping is required. The scanner infers usable checks from the file.</p>
+      <details>
+        <summary>Advanced optional files</summary>
+        <label for="reported_stats">Reported statistics CSV</label>
+        <input id="reported_stats" name="reported_stats" type="file" accept=".csv,text/csv">
+        <label for="p_values">P-values CSV</label>
+        <input id="p_values" name="p_values" type="file" accept=".csv,text/csv">
+      </details>
       <button id="scan-button" type="submit">Scan</button>
       <div id="error" class="error"></div>
     </form>
     <section id="results">
-      <div class="panel empty">Run a scan to see specific abnormal indicators.</div>
+      <div class="panel empty">Upload any CSV to see automatically selected checks and specific abnormal indicators.</div>
     </section>
   </main>
   <script>
@@ -224,6 +230,7 @@ _HTML = """
       summary.append(metric("Overall Risk", report.overall_risk));
       summary.append(metric("Sections", report.sections.length));
       results.append(summary);
+      results.append(autoDetection(report.auto_detection || {}));
       for (const section of report.sections) {
         const panel = document.createElement("article");
         panel.className = "panel section";
@@ -252,6 +259,15 @@ _HTML = """
       const div = document.createElement("div");
       div.className = "panel metric";
       div.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong>`;
+      return div;
+    }
+
+    function autoDetection(auto) {
+      const div = document.createElement("div");
+      div.className = "panel detected";
+      const notes = auto.notes || [];
+      const lines = notes.length ? notes : ["No group, time, p-value, or reported-statistics columns were detected; numeric dataset checks were still run."];
+      div.innerHTML = `<h2>Auto-detected inputs</h2><ul>${lines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`;
       return div;
     }
 

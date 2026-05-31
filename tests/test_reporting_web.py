@@ -31,7 +31,7 @@ def test_detail_lines_skip_zero_score_findings() -> None:
 
 def test_web_scan_api_returns_detail_lines() -> None:
     client = TestClient(app)
-    csv = b"a,b\n1,2\n2,4\n3,6\n4,8\n5,10\n"
+    csv = b"group,visit_date,a,b,p_value\nA,2024-01-01,1,2,0.049\nA,2024-01-02,2,4,0.048\nB,2024-01-03,3,6,0.2\nB,2024-01-04,4,8,0.8\nB,2024-01-05,5,10,0.7\n"
 
     response = client.post(
         "/api/scan",
@@ -40,6 +40,9 @@ def test_web_scan_api_returns_detail_lines() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["auto_detection"]["group_column"] == "group"
+    assert payload["auto_detection"]["time_column"] == "visit_date"
+    assert payload["auto_detection"]["p_values"] is True
     assert payload["sections"]
     assert any(
         finding.get("detail_lines")

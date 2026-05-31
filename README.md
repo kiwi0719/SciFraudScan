@@ -40,6 +40,8 @@ riskscan scan examples/suspicious_dataset.csv --format text
 riskscan scan examples/suspicious_dataset.csv --format json
 ```
 
+By default, SciFraudScan automatically detects usable columns in the dataset CSV, including group/treatment columns, time/date columns, p-value columns, and reported-statistics tables.
+
 With reported statistics and p-values:
 
 ```bash

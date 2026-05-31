@@ -10,6 +10,12 @@ def render_text_report(report: dict[str, Any]) -> str:
         f"Overall Risk: {report['overall_risk']}",
         "",
     ]
+    auto_detection = report.get("auto_detection") or {}
+    notes = auto_detection.get("notes") or []
+    if notes:
+        lines.append("Auto Detection:")
+        lines.extend(f"  - {note}" for note in notes)
+        lines.append("")
     for section in report["sections"]:
         lines.append(f"{section['name']}: {section['status']} ({section['score']} / 100)")
         for finding in section["findings"]:
