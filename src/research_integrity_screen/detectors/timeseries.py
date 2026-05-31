@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy import signal
+from statsmodels.tsa.stattools import acf
 
 from research_integrity_screen.models import Finding
 from research_integrity_screen.utils import numeric_frame
@@ -15,10 +17,10 @@ def autocorrelation_analysis(df: pd.DataFrame, time_column: str | None = None) -
         values = num[column].dropna().to_numpy(dtype=float)
         if len(values) < 10 or np.std(values) <= 1e-12:
             continue
-        lag1 = float(np.corrcoef(values[:-1], values[1:])[0, 1])
+        lag1 = float(acf(values, nlags=1, fft=False, missing="drop")[1])
         diffs = np.diff(values)
         diff_lag1 = (
-            float(np.corrcoef(diffs[:-1], diffs[1:])[0, 1])
+            float(acf(diffs, nlags=1, fft=False, missing="drop")[1])
             if len(diffs) > 2 and np.std(diffs[:-1]) > 1e-12 and np.std(diffs[1:]) > 1e-12
             else 0.0
         )
@@ -42,8 +44,7 @@ def spectral_analysis(df: pd.DataFrame, time_column: str | None = None) -> Findi
         values = num[column].dropna().to_numpy(dtype=float)
         if len(values) < 16 or np.std(values) == 0:
             continue
-        centered = values - values.mean()
-        power = np.abs(np.fft.rfft(centered)) ** 2
+        _, power = signal.periodogram(values, detrend="constant")
         if len(power) <= 2 or power.sum() == 0:
             continue
         power[0] = 0

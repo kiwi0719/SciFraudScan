@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import math
-
-import numpy as np
 import pandas as pd
+import pysprite
 from scipy import stats
 
 from research_integrity_screen.models import Finding
@@ -11,8 +9,9 @@ from research_integrity_screen.utils import safe_float
 
 
 def grim_possible(n: int, mean: float, scale_step: float = 1.0) -> bool:
-    total = mean * n / scale_step
-    return abs(total - round(total)) < 1e-8
+    if scale_step != 1:
+        return _scaled_grim_possible(n, mean, scale_step)
+    return bool(pysprite.grim(n, mean, prec=_decimal_precision(mean)))
 
 
 def sprite_possible(
@@ -26,39 +25,22 @@ def sprite_possible(
 ) -> bool:
     if n <= 1 or scale_step <= 0 or scale_min > scale_max:
         return False
-    scaled_values = np.arange(scale_min, scale_max + scale_step / 2, scale_step, dtype=float)
-    target_sum = int(round(mean * n / scale_step))
-    shifted = np.round(scaled_values / scale_step).astype(int)
-    min_value, max_value = int(shifted.min()), int(shifted.max())
-    if target_sum < min_value * n or target_sum > max_value * n:
+    if scale_step != 1:
         return False
-
-    possible_sums: dict[int, tuple[int, int]] = {0: (0, 0)}
-    squared = shifted**2
-    for _ in range(n):
-        next_sums: dict[int, tuple[int, int]] = {}
-        for current_sum, (_, current_sq) in possible_sums.items():
-            for value, sq in zip(shifted, squared):
-                new_sum = current_sum + int(value)
-                if min_value * n <= new_sum <= max_value * n:
-                    new_sq = current_sq + int(sq)
-                    existing = next_sums.get(new_sum)
-                    if existing is None or abs(new_sq - sd) < abs(existing[1] - sd):
-                        next_sums[new_sum] = (new_sum, new_sq)
-        possible_sums = next_sums
-        if not possible_sums:
-            return False
-    if target_sum not in possible_sums:
+    try:
+        sprite = pysprite.Sprite(
+            n,
+            mean,
+            sd,
+            _decimal_precision(mean),
+            _decimal_precision(sd),
+            int(scale_min),
+            int(scale_max),
+        )
+        result = sprite.find_possible_distribution()
+    except ValueError:
         return False
-
-    candidates = []
-    for total, total_sq in [possible_sums[target_sum]]:
-        raw_mean = total * scale_step / n
-        raw_values_sq = total_sq * scale_step * scale_step
-        sample_var = (raw_values_sq - n * raw_mean * raw_mean) / (n - 1)
-        if sample_var >= -1e-9:
-            candidates.append(math.sqrt(max(0.0, sample_var)))
-    return any(abs(candidate - sd) <= tolerance for candidate in candidates)
+    return bool(result and result[0] == "Success")
 
 
 def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
@@ -145,6 +127,18 @@ def _int(value: object) -> int | None:
     if number is None:
         return None
     return int(round(number))
+
+
+def _scaled_grim_possible(n: int, mean: float, scale_step: float) -> bool:
+    total = mean * n / scale_step
+    return abs(total - round(total)) < 1e-8
+
+
+def _decimal_precision(value: float) -> int:
+    text = f"{value:.12g}"
+    if "." not in text:
+        return 0
+    return len(text.rstrip("0").split(".", maxsplit=1)[1])
 
 
 def _status(score: float) -> str:

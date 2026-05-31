@@ -4,6 +4,7 @@ import math
 import re
 import zlib
 
+import benford
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -13,16 +14,17 @@ from research_integrity_screen.utils import numeric_frame
 
 
 def benford_law(df: pd.DataFrame) -> Finding:
-    digits = _first_digits(numeric_frame(df))
-    if len(digits) < 30:
+    values = _benford_values(numeric_frame(df))
+    if len(values) < 30:
         return Finding("Benford Law", "Pass", 0, "Fewer than 30 usable leading digits.")
 
-    observed = np.array([(digits == digit).sum() for digit in range(1, 10)], dtype=float)
-    expected_probs = np.log10(1 + 1 / np.arange(1, 10))
+    result = benford.first_digits(pd.Series(values), digs=1, decimals=8, sign="all", verbose=False)
+    observed = result["Counts"].to_numpy(dtype=float)
+    expected_probs = result["Expected"].to_numpy(dtype=float)
     expected = expected_probs * observed.sum()
     chi_square = float(((observed - expected) ** 2 / expected).sum())
     p_value = float(stats.chi2.sf(chi_square, df=8))
-    mad = float(np.mean(np.abs(observed / observed.sum() - expected_probs)))
+    mad = float(benford.mad(pd.Series(values), test=1, decimals=8, sign="all", verbose=False))
     score = min(100.0, max(0.0, -math.log10(max(p_value, 1e-12)) * 18 + mad * 900))
     return Finding(
         "Benford Law",
@@ -30,7 +32,7 @@ def benford_law(df: pd.DataFrame) -> Finding:
         score,
         f"Leading-digit distribution has chi-square p={p_value:.4g} and MAD={mad:.4f}.",
         {
-            "n": int(len(digits)),
+            "n": int(len(values)),
             "observed": observed.astype(int).tolist(),
             "expected_probabilities": [round(float(x), 6) for x in expected_probs],
             "chi_square": round(chi_square, 6),
@@ -46,7 +48,7 @@ def digit_preference(df: pd.DataFrame) -> Finding:
         return Finding("Digit Preference", "Pass", 0, "Fewer than 30 usable terminal digits.")
     counts = np.array([(last_digits == digit).sum() for digit in range(10)], dtype=float)
     probs = counts / counts.sum()
-    entropy = _entropy(probs)
+    entropy = float(stats.entropy(probs, base=2))
     expected_entropy = math.log2(10)
     top_digit = int(np.argmax(counts))
     top_rate = float(counts.max() / counts.sum())
@@ -107,16 +109,13 @@ def run_authenticity_checks(df: pd.DataFrame) -> list[Finding]:
     return [benford_law(df), digit_preference(df), information_entropy(df)]
 
 
-def _first_digits(df: pd.DataFrame) -> np.ndarray:
-    digits: list[int] = []
+def _benford_values(df: pd.DataFrame) -> np.ndarray:
+    values: list[float] = []
     for value in df.to_numpy().ravel():
         if pd.isna(value) or float(value) == 0:
             continue
-        text = f"{abs(float(value)):.12g}"
-        match = re.search(r"[1-9]", text)
-        if match:
-            digits.append(int(match.group(0)))
-    return np.array(digits, dtype=int)
+        values.append(float(value))
+    return np.array(values, dtype=float)
 
 
 def _last_digits(df: pd.DataFrame) -> np.ndarray:
@@ -129,11 +128,6 @@ def _last_digits(df: pd.DataFrame) -> np.ndarray:
         if match:
             digits.append(int(match.group(1)))
     return np.array(digits, dtype=int)
-
-
-def _entropy(probs: np.ndarray) -> float:
-    nonzero = probs[probs > 0]
-    return float(-(nonzero * np.log2(nonzero)).sum())
 
 
 def _status(score: float) -> str:

@@ -50,7 +50,7 @@ def _run_scan(args: argparse.Namespace) -> dict[str, Any]:
 
 def _text(report: dict[str, Any]) -> str:
     lines = [
-        "Research Integrity Screen",
+        "SciFraudScan",
         f"Research Integrity Score: {report['research_integrity_score']} / 100",
         f"Overall Risk: {report['overall_risk']}",
         "",

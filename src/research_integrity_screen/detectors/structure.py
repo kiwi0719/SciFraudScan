@@ -4,6 +4,7 @@ from itertools import combinations
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from research_integrity_screen.models import Finding
 from research_integrity_screen.utils import finite_pair, numeric_frame
@@ -58,7 +59,7 @@ def perfect_correlation(df: pd.DataFrame, threshold: float = 0.995) -> Finding:
         x, y = finite_pair(num[left], num[right])
         if len(x) < 4 or np.std(x) <= 1e-12 or np.std(y) <= 1e-12:
             continue
-        r = float(np.corrcoef(x, y)[0, 1])
+        r = float(stats.pearsonr(x, y).statistic)
         if abs(r) >= threshold:
             matches.append({"left": str(left), "right": str(right), "r": round(r, 8)})
     score = min(100.0, len(matches) * 30)

@@ -15,6 +15,18 @@ This initial version focuses on the highest-yield checks:
 - P-value anomalies: suspicious clustering just below 0.05, p-curve shape, and excess significance.
 - Randomization, covariance, and time-series checks: Carlisle-style baseline p-value uniformity, covariance matrix structure, autocorrelation, and spectral periodicity.
 
+## External engines
+
+SciFraudScan uses mature open-source statistical libraries where they are directly usable from Python:
+
+- `benford-py` for Benford first-digit and MAD calculations.
+- `pysprite` for GRIM and SPRITE feasibility checks.
+- `scipy.stats` for entropy, distribution tests, correlations, and p-value recomputation.
+- `scipy.signal` for periodogram-based spectral analysis.
+- `statsmodels` for autocorrelation analysis.
+
+Checks without a mature Python-native research-integrity package, such as duplicate detection, constant difference/ratio detection, linear-transformation duplication, over-regularity, Carlisle-style aggregation, covariance structure flags, and p-value clustering, are implemented inside this project.
+
 ## Install
 
 ```bash
