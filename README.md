@@ -1,8 +1,8 @@
 # SciFraudScan
 
-SciFraudScan is an open-source research integrity screening toolkit for detecting statistical anomaly signals in scientific datasets, reported results, and p-value patterns. It helps reviewers, journals, institutions, and researchers prioritize suspicious cases for deeper audit, while treating every result as a risk signal rather than a direct misconduct verdict.
+SciFraudScan is an open-source research integrity screening toolkit for detecting statistical anomaly signals in scientific datasets, reported results, and p-value patterns. It helps reviewers, journals, institutions, and researchers prioritize suspicious cases for deeper audit.
 
-SciFraudScan 是一个开源科研诚信筛查工具，用于从科研数据、论文报告统计量和 p 值分布中发现统计异常信号。它可以帮助审稿人、期刊、科研机构和研究者优先定位需要进一步核查的可疑数据，但所有输出都应被理解为“风险提示”，而不是对学术不端的直接判定。
+SciFraudScan 是一个开源科研诚信筛查工具，用于从科研数据、论文报告统计量和 p 值分布中发现统计异常信号。它可以帮助审稿人、期刊、科研机构和研究者优先定位需要进一步核查的可疑数据。
 
 ## First release scope
 
