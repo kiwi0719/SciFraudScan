@@ -19,11 +19,14 @@ keywords = [
 ]
 dependencies = [
   "benford-py>=0.5",
+  "fastapi>=0.115",
   "numpy>=1.24",
   "pandas>=2.0",
+  "python-multipart>=0.0.9",
   "pysprite>=1.2",
   "scipy>=1.10",
   "statsmodels>=0.14",
+  "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +37,7 @@ dev = [
 
 [project.scripts]
 riskscan = "research_integrity_screen.cli:main"
+scifraudscan-web = "research_integrity_screen.web:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/research_integrity_screen"]

@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 
 from research_integrity_screen.pipeline import scan_dataframe
+from research_integrity_screen.reporting import render_text_report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,19 +50,7 @@ def _run_scan(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _text(report: dict[str, Any]) -> str:
-    lines = [
-        "SciFraudScan",
-        f"Research Integrity Score: {report['research_integrity_score']} / 100",
-        f"Overall Risk: {report['overall_risk']}",
-        "",
-    ]
-    for section in report["sections"]:
-        lines.append(f"{section['name']}: {section['status']} ({section['score']} / 100)")
-        for finding in section["findings"]:
-            lines.append(f"  - {finding['check']}: {finding['status']} ({finding['score']})")
-            lines.append(f"    {finding['message']}")
-        lines.append("")
-    return "\n".join(lines).rstrip()
+    return render_text_report(report)
 
 
 if __name__ == "__main__":

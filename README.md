@@ -51,6 +51,14 @@ riskscan scan examples/suspicious_dataset.csv \
   --format text
 ```
 
+Run the local web interface:
+
+```bash
+scifraudscan-web
+```
+
+Then open `http://127.0.0.1:8765`.
+
 ## Input formats
 
 Main data should be a CSV file. Numeric columns are used for statistical checks; non-numeric columns are retained for exact row duplicate checks.
@@ -73,6 +81,8 @@ P-value CSV may contain a `p` column, or it may be a one-column file.
 ## Risk score
 
 The CLI returns a `Research Integrity Score` from 0 to 100. Higher means more statistical warning signals. This score is a triage aid, not proof of misconduct.
+
+Text and web reports include specific abnormal indicators, such as the affected column pair, transformed relationship, p-value mismatch row, terminal digit distribution, high-correlation rate, or repeated window location.
 
 ## Development
 
