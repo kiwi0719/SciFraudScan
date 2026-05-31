@@ -49,3 +49,16 @@ def test_web_scan_api_returns_detail_lines() -> None:
         for section in payload["sections"]
         for finding in section["findings"]
     )
+
+
+def test_web_home_has_single_upload_flow() -> None:
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    text = response.text
+    assert "Dataset CSV" in text
+    assert "Advanced optional files" not in text
+    assert "Group column" not in text
+    assert "Time column" not in text

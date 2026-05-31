@@ -61,6 +61,8 @@ scifraudscan-web
 
 Then open `http://127.0.0.1:8765`.
 
+The web interface accepts a single dataset CSV and automatically selects applicable checks from its columns.
+
 ## Input formats
 
 Main data should be a CSV file. Numeric columns are used for statistical checks; non-numeric columns are retained for exact row duplicate checks.

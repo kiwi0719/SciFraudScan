@@ -4,7 +4,7 @@ from io import BytesIO
 from typing import Annotated
 
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 
 from research_integrity_screen.pipeline import scan_dataframe
@@ -21,25 +21,13 @@ def index() -> str:
 @app.post("/api/scan")
 async def scan(
     data: Annotated[UploadFile, File()],
-    reported_stats: Annotated[UploadFile | None, File()] = None,
-    p_values: Annotated[UploadFile | None, File()] = None,
-    group_column: Annotated[str, Form()] = "",
-    time_column: Annotated[str, Form()] = "",
 ) -> dict[str, object]:
     try:
         df = await _read_csv(data)
-        reported_df = await _read_csv(reported_stats) if reported_stats and reported_stats.filename else None
-        p_values_df = await _read_csv(p_values) if p_values and p_values.filename else None
     except pd.errors.ParserError as exc:
         raise HTTPException(status_code=400, detail=f"CSV parse failed: {exc}") from exc
 
-    report = scan_dataframe(
-        df,
-        reported_stats=reported_df,
-        p_values=p_values_df,
-        group_column=group_column or None,
-        time_column=time_column or None,
-    )
+    report = scan_dataframe(df)
     for section in report["sections"]:
         for finding in section["findings"]:
             finding["detail_lines"] = finding_detail_lines(finding)
@@ -129,8 +117,6 @@ _HTML = """
       cursor: pointer;
     }
     button:disabled { opacity: .65; cursor: wait; }
-    details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
-    summary { cursor: pointer; color: var(--brand); font-weight: 700; font-size: 13px; }
     .hint { margin-top: 10px; font-size: 13px; }
     .detected { padding: 14px 16px; margin-bottom: 14px; }
     .detected h2 { margin: 0 0 8px; font-size: 16px; letter-spacing: 0; }
@@ -184,13 +170,6 @@ _HTML = """
       <label for="data">Dataset CSV</label>
       <input id="data" name="data" type="file" accept=".csv,text/csv" required>
       <p class="hint">No column mapping is required. The scanner infers usable checks from the file.</p>
-      <details>
-        <summary>Advanced optional files</summary>
-        <label for="reported_stats">Reported statistics CSV</label>
-        <input id="reported_stats" name="reported_stats" type="file" accept=".csv,text/csv">
-        <label for="p_values">P-values CSV</label>
-        <input id="p_values" name="p_values" type="file" accept=".csv,text/csv">
-      </details>
       <button id="scan-button" type="submit">Scan</button>
       <div id="error" class="error"></div>
     </form>
