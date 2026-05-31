@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "research-integrity-screen"
+version = "0.1.0"
+description = "Open-source screening toolkit for research data anomalies and scientific fraud risk signals."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Research Integrity Screen contributors" }]
+keywords = [
+  "research-integrity",
+  "scientific-fraud",
+  "data-forensics",
+  "statistics",
+  "p-hacking",
+]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+riskscan = "research_integrity_screen.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/research_integrity_screen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
