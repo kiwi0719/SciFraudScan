@@ -136,7 +136,9 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
                     }
                 )
 
-            if sd is not None and scale_min is not None and scale_max is not None:
+            # GRIMMER needs only N, mean and SD; the variance-bounds test additionally
+            # needs the scale, so the two run independently of each other.
+            if sd is not None:
                 sd_checked += 1
                 failure = _sd_failure(n, mean, sd, scale_min, scale_max, mean_decimals, row)
                 if failure:
@@ -182,30 +184,29 @@ def _sd_failure(
     n: int,
     mean: float,
     sd: float,
-    scale_min: float,
-    scale_max: float,
+    scale_min: float | None,
+    scale_max: float | None,
     mean_decimals: int,
     row: pd.Series,
 ) -> dict[str, object] | None:
-    minimum, maximum = sd_bounds(n, mean, scale_min, scale_max)
-    tolerance = 0.5 * 10 ** -decimal_places(row.get("sd"))
-    if sd > maximum + tolerance or sd < minimum - tolerance:
-        return {
-            "n": n,
-            "reported_mean": mean,
-            "reported_sd": sd,
-            "min_possible_sd": round(minimum, 6),
-            "max_possible_sd": round(maximum, 6),
-            "scale": [scale_min, scale_max],
-            "reason": "SD is outside the range attainable on this scale",
-        }
+    if scale_min is not None and scale_max is not None:
+        minimum, maximum = sd_bounds(n, mean, scale_min, scale_max)
+        tolerance = 0.5 * 10 ** -decimal_places(row.get("sd"))
+        if sd > maximum + tolerance or sd < minimum - tolerance:
+            return {
+                "n": n,
+                "reported_mean": mean,
+                "reported_sd": sd,
+                "min_possible_sd": round(minimum, 6),
+                "max_possible_sd": round(maximum, 6),
+                "scale": [scale_min, scale_max],
+                "reason": "SD is outside the range attainable on this scale",
+            }
     if not grimmer_consistent(n, mean, sd, mean_decimals, decimal_places(row.get("sd"))):
         return {
             "n": n,
             "reported_mean": mean,
             "reported_sd": sd,
-            "min_possible_sd": round(minimum, 6),
-            "max_possible_sd": round(maximum, 6),
             "reason": "no integer sum of squares matches this mean and SD (GRIMMER)",
         }
     return None
@@ -235,9 +236,7 @@ def _grim_finding(failures: list[dict[str, object]], checked: int) -> Finding:
 def _sd_finding(failures: list[dict[str, object]], checked: int) -> Finding:
     check = "SD Feasibility (GRIMMER / variance bounds)"
     if checked == 0:
-        return not_applicable(
-            check, "No row supplied N, mean, SD and scale bounds together."
-        )
+        return not_applicable(check, "No row supplied N, mean and SD together.")
     if not failures:
         return clear(check, f"All {checked} mean/SD pairs are attainable.", n_checked=checked)
     return flag(

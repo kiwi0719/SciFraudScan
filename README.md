@@ -69,8 +69,29 @@ python benchmarks/generate_examples.py   # regenerate from a fixed seed
 ```
 
 This shows the checks fire on what they claim to detect and stay quiet on
-honest data of the same shape. It is **not** a real-world false positive rate:
-nothing here has been validated against a corpus of retracted papers.
+honest data of the same shape.
+
+### Real published cases
+
+`benchmarks/real_cases/` validates the reported-statistics checks against real
+papers whose numbers have already been examined in the peer-reviewed
+literature, cell by cell, against the verdicts that reanalysis reached:
+
+| Case | Status | Cells | Agreement |
+|---|---|---|---|
+| Sigirci & Wansink (2015), *BMC Nutrition* | **Retracted** 2017 | 30 means, 20 SDs | 30/30, 20/20 |
+| Just, Sigirci & Wansink (2014), *J Sensory Studies* | Corrected 2017 | 28 | 28/28 |
+
+Expected verdicts come from [van der Zee, Anaya & Brown (2017)](https://doi.org/10.1186/s40795-017-0167-x),
+cross-checked against the means and SDs in the reanalysis authors'
+[own repository](https://github.com/OmnesRes/pizzapizza). Half of these cells
+are values that reanalysis found *consistent*, so they test the false-positive
+side too. Each case's `SOURCE.md` records the DOIs, the editorial outcome, and
+where every number came from.
+
+This is still narrow: it validates GRIM and GRIMMER on two papers from one
+lab. It is not a general false positive rate, and the data-side checks
+(duplication, digits, Carlisle) have no real-case validation at all.
 
 ## Limitations
 

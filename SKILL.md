@@ -116,10 +116,18 @@ check's assumptions, minimum data, thresholds and failure modes.
 
 No image forensics, no text or reference checking, no full SPRITE search, no
 statcheck prose parsing. The p-value checks need a body of results, not one
-study. Nothing here has been validated against a corpus of retracted papers,
-so there is no known real-world false positive rate.
+study.
 
-## Reproducing the benchmark
+Real-case validation covers GRIM and GRIMMER on two papers from one lab. The
+data-side checks have none. There is no known real-world false positive rate,
+so do not quote one.
+
+## Reproducing the benchmarks
+
+`benchmarks/real_cases/` validates GRIM and GRIMMER against real published
+papers, cell by cell, against the verdicts a published reanalysis reached —
+including the cells it found consistent. Read a case's `SOURCE.md` if you want
+to see what a careful write-up of this kind of finding looks like.
 
 `examples/clean_trial.csv` is honestly generated and should raise zero flags.
 `examples/fabricated_trial.csv` is the same trial with five planted defects.

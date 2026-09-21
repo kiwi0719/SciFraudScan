@@ -12,3 +12,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 @pytest.fixture(scope="session")
 def examples_dir() -> Path:
     return ROOT / "examples"
+
+
+@pytest.fixture(scope="session")
+def real_cases_dir() -> Path:
+    return ROOT / "benchmarks" / "real_cases"

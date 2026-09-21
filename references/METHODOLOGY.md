@@ -240,11 +240,17 @@ On one study's handful of p-values they have no power, and each returns
 
 ## Known gaps
 
-- No validation against a corpus of genuinely retracted papers. The benchmark
-  in `benchmarks/` uses synthetic data with planted defects, which establishes
-  that the checks fire on what they claim to detect and stay quiet on honest
-  data of the same shape. It does **not** establish a real-world false
-  positive rate.
+- **Real-case validation covers GRIM and GRIMMER only, on two papers.**
+  `benchmarks/real_cases/` reproduces the per-cell verdicts of a published
+  reanalysis of one retracted and one corrected paper (58 cells, full
+  agreement, roughly half of them consistent-value controls). That validates
+  the arithmetic checks against real reported statistics. It does not
+  generalize to a false positive rate across the literature.
+- **The data-side checks have no real-case validation.** Duplication, digit
+  preference, Carlisle balance and the sequential checks are tested only
+  against synthetic data with planted defects, which shows they fire on what
+  they claim to detect and stay quiet on honest data of the same shape, and
+  nothing more.
 - No SPRITE, no full statcheck (which parses prose, not tables), no image
   forensics, no text or reference checks.
 - Multiple comparisons across ~22 checks are not corrected for. Running enough

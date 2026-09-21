@@ -1,0 +1,31 @@
+test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,p,source_location,item,published_mean_verdict,published_sd_verdict
+grimmer,18,2.63,2.06,,,1,,,,,"Table 2, $4, 1 piece",I ate more pizza than I should have,inconsistent,consistent
+grimmer,18,4.82,2.55,,,1,,,,,"Table 2, $4, 2 pieces",I ate more pizza than I should have,inconsistent,consistent
+grimmer,7,6.00,2.00,,,1,,,,,"Table 2, $4, 3 pieces",I ate more pizza than I should have,consistent,consistent
+grimmer,17,1.76,1.82,,,1,,,,,"Table 2, $8, 1 piece",I ate more pizza than I should have,consistent,consistent
+grimmer,19,3.53,2.39,,,1,,,,,"Table 2, $8, 2 pieces",I ate more pizza than I should have,consistent,consistent
+grimmer,10,4.40,3.24,,,1,,,,,"Table 2, $8, 3 pieces",I ate more pizza than I should have,consistent,consistent
+grimmer,18,2.39,1.94,,,1,,,,,"Table 2, $4, 1 piece",I feel guilty about how much I ate,consistent,consistent
+grimmer,18,3.44,2.47,,,1,,,,,"Table 2, $4, 2 pieces",I feel guilty about how much I ate,consistent,inconsistent
+grimmer,7,3.71,1.49,,,1,,,,,"Table 2, $4, 3 pieces",I feel guilty about how much I ate,consistent,inconsistent
+grimmer,17,2.26,1.79,,,1,,,,,"Table 2, $8, 1 piece",I feel guilty about how much I ate,inconsistent,consistent
+grimmer,19,1.68,1.42,,,1,,,,,"Table 2, $8, 2 pieces",I feel guilty about how much I ate,consistent,consistent
+grimmer,10,2.90,2.08,,,1,,,,,"Table 2, $8, 3 pieces",I feel guilty about how much I ate,consistent,consistent
+grimmer,18,2.17,1.88,,,1,,,,,"Table 2, $4, 1 piece",I am physically uncomfortable,consistent,inconsistent
+grimmer,18,2.94,2.12,,,1,,,,,"Table 2, $4, 2 pieces",I am physically uncomfortable,consistent,inconsistent
+grimmer,7,2.43,1.51,,,1,,,,,"Table 2, $4, 3 pieces",I am physically uncomfortable,consistent,consistent
+grimmer,17,1.97,1.68,,,1,,,,,"Table 2, $8, 1 piece",I am physically uncomfortable,inconsistent,consistent
+grimmer,19,1.45,0.94,,,1,,,,,"Table 2, $8, 2 pieces",I am physically uncomfortable,inconsistent,consistent
+grimmer,10,2.25,1.81,,,1,,,,,"Table 2, $8, 3 pieces",I am physically uncomfortable,inconsistent,consistent
+grimmer,18,2.11,1.81,,,1,,,,,"Table 2, $4, 1 piece",I overate,consistent,consistent
+grimmer,18,3.89,2.59,,,1,,,,,"Table 2, $4, 2 pieces",I overate,consistent,consistent
+grimmer,7,3.71,1.79,,,1,,,,,"Table 2, $4, 3 pieces",I overate,consistent,inconsistent
+grimmer,17,1.67,1.28,,,1,,,,,"Table 2, $8, 1 piece",I overate,inconsistent,consistent
+grimmer,19,1.67,1.24,,,1,,,,,"Table 2, $8, 2 pieces",I overate,inconsistent,consistent
+grimmer,10,3.50,2.74,,,1,,,,,"Table 2, $8, 3 pieces",I overate,consistent,inconsistent
+grimmer,18,2.50,2.20,,,1,,,,,"Table 2, $4, 1 piece",I ate more than I should have,consistent,consistent
+grimmer,18,4.28,2.44,,,1,,,,,"Table 2, $4, 2 pieces",I ate more than I should have,consistent,consistent
+grimmer,7,4.57,2.22,,,1,,,,,"Table 2, $4, 3 pieces",I ate more than I should have,consistent,inconsistent
+grimmer,17,2.00,1.45,,,1,,,,,"Table 2, $8, 1 piece",I ate more than I should have,consistent,inconsistent
+grimmer,19,2.14,1.77,,,1,,,,,"Table 2, $8, 2 pieces",I ate more than I should have,inconsistent,consistent
+grimmer,10,3.92,2.81,,,1,,,,,"Table 2, $8, 3 pieces",I ate more than I should have,inconsistent,consistent
