@@ -173,9 +173,34 @@ steps by construction.
   paper, and is how Carlisle and Bolland apply the method.
 - **Needs:** a group column and at least 5 usable baseline variables.
   High-cardinality categoricals (IDs) are excluded.
-- **Two tests are run:** a two-sided KS test against uniform, and a one-sided
-  KS test for the too-balanced direction. The one-sided test has more power
-  against fabrication and is usually the one that fires.
+- **The null depends on where the p-values came from.** This matters more
+  than anything else in this section.
+
+  From *raw participant data*, baseline p-values are uniform under
+  randomization, and `carlisle_method` tests against uniform with a two-sided
+  KS test plus a one-sided test for the too-balanced direction.
+
+  From a *published baseline table*, they are not. Rounded summary statistics
+  produce ties and near-ties that push p toward 1. In Carlisle's corpus of
+  29,789 baseline variables from 5087 real trials, **13.1% of baseline
+  p-values exceed 0.95 and 11.1% exceed 0.99**, against 5% and 1% under a
+  uniform distribution. `baseline_summary_check` therefore compares against
+  that empirical distribution, not against uniform.
+
+  Testing a published table against uniform is not a small error:
+
+  | Baseline variables | Uniform null, honest data | Empirical reference |
+  |---|---|---|
+  | 50 | 4% flagged | ~1% |
+  | 200 | 52% flagged | ~1% |
+  | 500 | **100% flagged** | ~1% |
+
+- **A KS test is invalid against the empirical reference,** which is atomic.
+  The comparison is a Monte-Carlo test on the mean of the p-values, with the
+  null drawn from the reference itself. Mean p is equivalent to the area
+  under the CDF, the summary Bolland et al. use. Power is retained: a
+  collection of 200 variables nudged upward by U(0, 0.25) is detected 99% of
+  the time.
 - **The central caveat:** the uniformity result assumes independent baseline
   variables. Real baseline tables are correlated -- height with weight, age
   with comorbidity -- which makes the test anti-conservative. A flag here is a
@@ -185,13 +210,14 @@ steps by construction.
   (Bolland et al. 2020). The reference implementation compares against an
   empirically simulated distribution instead; this one does not, which makes
   it cruder.
-- **Badly underpowered on small collections.** With 8 variables the test
-  missed a deliberately fabricated dataset during development. On 50 real
-  baseline variables from the retracted Sato/Iwamoto trials it returns
-  `clear`, with mean p = 0.567 against the 0.500 expected — the shift is in
-  the fabrication direction but nowhere near significance. Bolland et al.
-  needed roughly 500 variables. **A `clear` from this check is close to
-  uninformative unless the collection is large.**
+- **Underpowered on small collections.** With 8 variables the test missed a
+  deliberately fabricated dataset during development. On 50 real baseline
+  variables from the retracted Sato/Iwamoto trials it returns `clear`: mean
+  p = 0.567 against 0.516 in real published trials, Monte-Carlo p = 0.13.
+  Against the *correct* reference the excess is small — 30% of those
+  p-values exceed 0.8 against 23.7% in the real literature, not the 20% a
+  uniform null would claim. **A `clear` from this check is close to
+  uninformative unless the collection runs to a few hundred variables.**
 
 ### Reported baseline p-value consistency
 

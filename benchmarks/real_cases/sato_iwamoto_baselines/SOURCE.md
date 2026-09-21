@@ -58,12 +58,16 @@ maximally rounded summary statistics.
 
 On these 50 variables the uniformity test returns **clear**:
 
-| Statistic | Value | Expected under randomization |
+| Statistic | These 50 variables | Real published trials |
 |---|---|---|
-| mean baseline p | 0.567 | 0.500 |
-| proportion p > 0.8 | 30% | 20% |
-| two-sided KS p | 0.366 | — |
-| one-sided "too balanced" p | 0.184 | — |
+| mean baseline p | 0.567 | 0.516 |
+| proportion p > 0.8 | 30.0% | 23.7% |
+| Monte-Carlo "too balanced" p | 0.13 | — |
+
+The comparison is against Carlisle's empirical distribution of 29,789
+baseline variables from 5087 real trials, not against a uniform distribution.
+That choice matters here: a uniform null would put the expected proportion
+above 0.8 at 20% rather than 23.7%, overstating the excess.
 
 The shift is in the fabrication direction but does not reach significance.
 This is a **negative result on real fabricated data and it is recorded as
@@ -75,12 +79,11 @@ Why it does not fire here:
   variables and reported that over half exceeded p = 0.8. 50 variables give
   far too little power for a shift of this size, and the sample is a
   package illustration, not a random draw from the full set.
-- **The published method is not this test.** Bolland et al. compare the
-  observed distribution against an *empirically simulated* reference that
-  accounts for the rounding of published summary statistics, and summarise it
-  by the area under the CDF — not a KS test against an exactly uniform
-  reference. Rounding alone moves the distribution away from uniform
-  (Bolland et al. 2020, *Anaesthesia* 75, doi:10.1111/anae.15165).
+- **The excess over the correct reference is genuinely small.** Measured
+  against real published baseline tables rather than a uniform distribution,
+  these 50 variables sit only 0.05 above the reference mean. Bolland et al.
+  reported that over half of the full 500-variable set exceeded p = 0.8; this
+  10% sample shows 30%.
 
 The honest conclusion is that our Carlisle check is usable for triage on large
 baseline collections and is underpowered on small ones. The p-value

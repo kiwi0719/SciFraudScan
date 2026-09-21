@@ -81,7 +81,7 @@ literature, cell by cell, against the verdicts that reanalysis reached:
 |---|---|---|---|
 | Sigirci & Wansink (2015), *BMC Nutrition* | **Retracted** 2017 | GRIM / GRIMMER, 30 means + 20 SDs | 30/30, 20/20 match published verdicts |
 | Just, Sigirci & Wansink (2014), *J Sensory Studies* | Corrected 2017 | GRIM / GRIMMER, 28 cells | 28/28 match published verdicts |
-| Sato / Iwamoto trials | **Retracted** (20+ papers) | Baseline tables, 50 variables | 5 of 10 printed p-values unreachable; Carlisle uniformity **does not fire** |
+| Sato / Iwamoto trials | **Retracted** (20+ papers) | Baseline tables, 50 variables | 5 of 10 printed p-values unreachable; balance test **does not fire** |
 
 The Wansink verdicts come from [van der Zee, Anaya & Brown (2017)](https://doi.org/10.1186/s40795-017-0167-x),
 cross-checked against the reanalysis authors'
@@ -93,12 +93,21 @@ false-positive side is tested too. Each case's `SOURCE.md` records the DOIs,
 the editorial outcome, and where every number came from.
 
 **The Sato case includes a negative result and it is kept.** On those 50
-baseline variables the Carlisle uniformity test returns `clear` (mean p =
-0.567 against 0.500 expected; KS p = 0.37): a 10% sample is too small for the
-test to have power, and the published method uses a simulated reference
-rather than an exactly uniform one. No threshold was moved to make it fire.
-The p-value reachability check, which assumes nothing about the distribution,
+baseline variables the balance test returns `clear` (mean p = 0.567 against
+0.516 in real published trials; Monte-Carlo p = 0.13). A 10% sample is too
+small for the test to have power. No threshold was moved to make it fire; the
+p-value reachability check, which assumes nothing about the distribution,
 carried that case instead.
+
+Chasing that negative result turned up a worse problem, since fixed:
+**baseline p-values from published, rounded summary statistics are not
+uniformly distributed even when the trial is honest.** In Carlisle's corpus of
+29,789 real baseline variables, 13.1% exceed 0.95 against 5% under a uniform
+null. Tested against uniform, honest collections of 500 baseline variables
+were flagged **100% of the time**. Published tables are now compared against
+that empirical distribution instead, which holds the false positive rate near
+1% while still detecting a genuinely too-balanced collection 99% of the time.
+See [`scripts/scifraudscan/reference/README.md`](scripts/scifraudscan/reference/README.md).
 
 Still narrow: the arithmetic checks are validated on three real cases from two
 research groups. Duplication, digit preference and the sequential checks have
