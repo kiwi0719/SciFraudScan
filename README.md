@@ -1,99 +1,84 @@
 # SciFraudScan
 
-SciFraudScan is an open-source research integrity screening toolkit for detecting statistical anomaly signals in scientific datasets, reported results, and p-value patterns. It helps reviewers, journals, institutions, and researchers prioritize suspicious cases for deeper audit.
+A Claude skill for screening research data and reported statistics for
+anomaly signals: impossible means and SDs, p-values that disagree with their
+test statistics, duplicated or derived columns, digit preference, implausible
+baseline balance, and p-hacking signatures across a literature.
 
-SciFraudScan 是一个开源科研诚信筛查工具，用于从科研数据、论文报告统计量和 p 值分布中发现统计异常信号。它可以帮助审稿人、期刊、科研机构和研究者优先定位需要进一步核查的可疑数据。
-
-## First release scope
-
-This initial version focuses on the highest-yield checks:
-
-- Data duplication: exact duplicate rows, near duplicates, linear-transformation duplicates, permutation duplicates, and partial repeated numeric windows.
-- Data authenticity: Benford Law, terminal-digit preference, and entropy/compression-style low-complexity checks.
-- Structural anomalies: constant differences, constant ratios, near-perfect correlations, and over-regularity.
-- Reported statistics validation: GRIM, SPRITE, and consistency checks for reported `t`, `F`, and chi-square p-values.
-- P-value anomalies: suspicious clustering just below 0.05, p-curve shape, and excess significance.
-- Randomization, covariance, and time-series checks: Carlisle-style baseline p-value uniformity, covariance matrix structure, autocorrelation, and spectral periodicity.
-
-## External engines
-
-SciFraudScan uses mature open-source statistical libraries where they are directly usable from Python:
-
-- `benford-py` for Benford first-digit and MAD calculations.
-- `pysprite` for GRIM and SPRITE feasibility checks.
-- `scipy.stats` for entropy, distribution tests, correlations, and p-value recomputation.
-- `scipy.signal` for periodogram-based spectral analysis.
-- `statsmodels` for autocorrelation analysis.
-
-Checks without a mature Python-native research-integrity package, such as duplicate detection, constant difference/ratio detection, linear-transformation duplication, over-regularity, Carlisle-style aggregation, covariance structure flags, and p-value clustering, are implemented inside this project.
+SciFraudScan 是一个科研诚信筛查 skill，用于从科研数据和论文报告的统计量中发现
+异常信号。所有检查只产生**需要进一步核查的线索**，不构成对任何人的学术不端指控。
 
 ## Install
 
+Clone into your skills directory, then:
+
 ```bash
-python -m pip install -e ".[dev]"
+pip install -r requirements.txt
 ```
 
-## Quick start
+Claude loads `SKILL.md` and drives `scripts/scan.py` from there. It also works
+as a plain CLI:
 
 ```bash
-riskscan scan examples/suspicious_dataset.csv --format text
-riskscan scan examples/suspicious_dataset.csv --format json
-```
-
-By default, SciFraudScan automatically detects usable columns in the dataset CSV, including group/treatment columns, time/date columns, p-value columns, and reported-statistics tables.
-
-With reported statistics and p-values:
-
-```bash
-riskscan scan examples/suspicious_dataset.csv \
+python scripts/scan.py examples/fabricated_trial.csv \
+  --group-column arm --time-column enrol_day \
   --reported-stats examples/reported_stats.csv \
-  --p-values examples/p_values.csv \
-  --group-column group \
-  --time-column visit_date \
-  --format text
+  --p-values examples/p_values.csv
 ```
 
-Run the local web interface:
+## What it checks
+
+| Group | Checks |
+|---|---|
+| `reported_stats` | GRIM, GRIMMER + variance bounds, p-value recomputation |
+| `authenticity` | Benford first digit, terminal digit preference, repeated increments |
+| `duplication` | Exact and near-duplicate rows, linear-transform and permutation duplicates, repeated value blocks |
+| `structure` | Constant difference, constant ratio, near-perfect correlation, over-regularity |
+| `randomization` | Carlisle baseline balance (two-sided and too-balanced tests) |
+| `covariance` | Near-collinear pairs, near-singular covariance |
+| `timeseries` | Serial autocorrelation, spectral periodicity |
+| `pvalues` | Caliper test, p-curve shape, excess significance |
+
+The reported-statistics checks need no raw data — only the numbers printed in
+the paper — and are the only ones that can show a result is *impossible*
+rather than merely unusual.
+
+## There is no risk score
+
+Every check returns `flag`, `clear`, or `not_applicable`, with the numbers
+behind it. There is no 0-100 total, because an average over checks lets
+passing checks dilute a real finding and implies a calibration that does not
+exist. [`references/METHODOLOGY.md`](references/METHODOLOGY.md) explains each
+check's assumptions, minimum data, thresholds and failure modes — read it
+before repeating any result.
+
+## Benchmark
+
+`examples/clean_trial.csv` is honestly generated; `examples/fabricated_trial.csv`
+is the same trial with five defects planted in it.
+
+| | clean | fabricated |
+|---|---|---|
+| flagged | **0** | 14 |
+| clear | 15 | 7 |
+| not applicable | 1 | 1 |
 
 ```bash
-scifraudscan-web
+pytest                                   # includes this as a regression test
+python benchmarks/generate_examples.py   # regenerate from a fixed seed
 ```
 
-Then open `http://127.0.0.1:8765`.
+This shows the checks fire on what they claim to detect and stay quiet on
+honest data of the same shape. It is **not** a real-world false positive rate:
+nothing here has been validated against a corpus of retracted papers.
 
-The web interface accepts a single dataset CSV and automatically selects applicable checks from its columns.
+## Limitations
 
-## Input formats
-
-Main data should be a CSV file. Numeric columns are used for statistical checks; non-numeric columns are retained for exact row duplicate checks.
-
-Reported statistics CSV supports these rows:
-
-```csv
-test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,p
-grim,20,3.45,,1,5,1,,,,,
-sprite,20,3.45,0.76,1,5,1,,,,,
-t,,,,,, ,2.35,18,,0.030
-f,,,,,,,4.20,2,57,0.020
-chi2,,,,,,,7.82,3,,0.050
-```
-
-P-value CSV may contain a `p` column, or it may be a one-column file.
-
-`--group-column` enables Carlisle-style randomization checks across baseline variables. `--time-column` sorts rows before autocorrelation and spectral checks.
-
-## Risk score
-
-The CLI returns a `Research Integrity Score` from 0 to 100. Higher means more statistical warning signals. This score is a triage aid, not proof of misconduct.
-
-Text and web reports include specific abnormal indicators, such as the affected column pair, transformed relationship, p-value mismatch row, terminal digit distribution, high-correlation rate, or repeated window location.
-
-## Development
-
-```bash
-pytest
-ruff check .
-```
+Screening signals only. No image forensics, no text or reference checks, no
+full SPRITE search. The p-value checks need a body of results, not one study.
+Roughly 22 checks run without correction for multiple comparisons, so some
+flags on honest data are expected — severity and the per-check failure modes
+matter far more than the count.
 
 ## License
 
