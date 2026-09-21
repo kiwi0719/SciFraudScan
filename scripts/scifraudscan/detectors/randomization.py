@@ -20,6 +20,9 @@ Two entry points:
 
 from __future__ import annotations
 
+import functools
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -29,6 +32,9 @@ from scifraudscan.utils import decimal_places, numeric_frame, safe_float
 
 MIN_VARIABLES = 5
 MAX_CATEGORY_LEVELS = 20
+REFERENCE_FILE = (
+    Path(__file__).resolve().parent.parent / "reference" / "carlisle_baseline_p_reference.csv"
+)
 ALPHA = 0.01
 CAVEAT = (
     "Baseline variables are usually correlated, which violates the independence the "
@@ -115,11 +121,25 @@ def carlisle_method(df: pd.DataFrame, group_column: str | None = None) -> Findin
     )
 
 
-def _uniformity_finding(check: str, p: np.ndarray, extra: dict[str, object]) -> Finding:
-    ks_p = float(stats.kstest(p, "uniform").pvalue)
+def _uniformity_finding(
+    check: str, p: np.ndarray, extra: dict[str, object], reference: str = "uniform"
+) -> Finding:
+    """Compare a set of baseline p-values against the distribution they should follow.
+
+    `reference` is "uniform" for p-values computed from raw participant data,
+    and "carlisle" for p-values computed from published, rounded summary
+    statistics -- those are not uniform even when the trial is honest.
+    """
+    cdf = "uniform" if reference == "uniform" else carlisle_reference_cdf
+    expected = (
+        "a uniform distribution"
+        if reference == "uniform"
+        else "the distribution real published baseline tables follow"
+    )
+    ks_p = float(stats.kstest(p, cdf).pvalue)
     # Fabricated balance pushes baseline p-values toward 1, so a one-sided test
     # in that direction has more power than the two-sided test against it.
-    too_balanced_p = float(stats.kstest(p, "uniform", alternative="less").pvalue)
+    too_balanced_p = float(stats.kstest(p, cdf, alternative="less").pvalue)
     too_similar = int((p > 0.95).sum())
     too_different = int((p < 0.05).sum())
     shared = {
@@ -135,7 +155,7 @@ def _uniformity_finding(check: str, p: np.ndarray, extra: dict[str, object]) -> 
     if best_p >= ALPHA:
         return clear(
             check,
-            f"{len(p)} baseline p-values are consistent with uniformity "
+            f"{len(p)} baseline p-values are consistent with {expected} "
             f"(two-sided KS p={ks_p:.3g}, too-balanced p={too_balanced_p:.3g}).",
             **shared,
         )
@@ -145,11 +165,11 @@ def _uniformity_finding(check: str, p: np.ndarray, extra: dict[str, object]) -> 
             "the pattern left by baselines that were balanced after the fact"
         )
     else:
-        detail = f"they depart from uniformity in both directions (KS p={ks_p:.3g})"
+        detail = f"they depart from it in both directions (KS p={ks_p:.3g})"
     return flag(
         check,
         "high" if best_p < 0.001 else "moderate",
-        f"{len(p)} baseline p-values are not uniform: {detail}; "
+        f"{len(p)} baseline p-values do not follow {expected}: {detail}; "
         f"{too_similar} are above .95 and {too_different} below .05.",
         **shared,
     )
@@ -202,13 +222,41 @@ def baseline_summary_check(table: pd.DataFrame) -> Finding:
         )
     p = np.array([r["calculated_p"] for r in results], dtype=float)
     studies = sorted({r["study"] for r in results if r["study"]})
-    extra = {
+    balanced_p, different_p, reference_mean = _reference_monte_carlo(p)
+    shared = {
         "variable_count": len(p),
         "study_count": len(studies) or None,
-        "proportion_above_0_8": round(float((p > 0.8).mean()), 4),
+        "observed_mean_p": round(float(p.mean()), 4),
+        "reference_mean_p": round(reference_mean, 4),
+        "observed_proportion_above_0_8": round(float((p > 0.8).mean()), 4),
+        "reference_proportion_above_0_8": round(1 - float(carlisle_reference_cdf(0.8)), 4),
+        "too_balanced_p_value": float(f"{balanced_p:.6g}"),
+        "too_different_p_value": float(f"{different_p:.6g}"),
+        "reference": "Carlisle 5087 trials, 29,789 baseline variables",
         "variables": results[:100],
+        "caveat": CAVEAT,
     }
-    return _uniformity_finding(check, p, extra)
+    best = min(balanced_p, different_p)
+    if best >= ALPHA:
+        return clear(
+            check,
+            f"{len(p)} baseline p-values (mean {p.mean():.3f}) are consistent with what real "
+            f"published baseline tables look like (mean {reference_mean:.3f}); "
+            f"too-balanced p={balanced_p:.3g}.",
+            **shared,
+        )
+    direction = (
+        "more balanced than real published trials"
+        if balanced_p < different_p
+        else "less balanced than real published trials"
+    )
+    return flag(
+        check,
+        "high" if best < 0.001 else "moderate",
+        f"{len(p)} baseline p-values average {p.mean():.3f} against {reference_mean:.3f} in real "
+        f"published trials, making these groups {direction} (Monte-Carlo p={best:.3g}).",
+        **shared,
+    )
 
 
 def reported_baseline_p_check(table: pd.DataFrame) -> Finding:
@@ -322,6 +370,56 @@ def _reachable_p_range(
     if not values:
         return None
     return min(values), max(values)
+
+
+@functools.lru_cache(maxsize=1)
+def _carlisle_reference() -> tuple[np.ndarray, np.ndarray]:
+    """Empirical CDF of baseline p-values in real published trials.
+
+    Carlisle's 29,789 baseline variables from 5087 trials. Published summary
+    statistics are rounded, which creates ties and pushes p-values toward 1,
+    so the real distribution is markedly non-uniform: 13.1% of it lies above
+    0.95 against 5% for a uniform distribution. Testing a published baseline
+    table against a uniform null flags honest papers -- at 500 variables it
+    does so essentially always. See scripts/scifraudscan/reference/README.md.
+    """
+    table = pd.read_csv(REFERENCE_FILE)
+    return (
+        table["p_value"].to_numpy(dtype=float),
+        table["cumulative_proportion"].to_numpy(dtype=float),
+    )
+
+
+def carlisle_reference_cdf(p: np.ndarray | float) -> np.ndarray:
+    """Proportion of real published baseline p-values at or below `p`."""
+    quantiles, cumulative = _carlisle_reference()
+    return np.interp(p, quantiles, cumulative, left=0.0, right=1.0)
+
+
+def _reference_monte_carlo(
+    p: np.ndarray, simulations: int = 20000, seed: int = 0
+) -> tuple[float, float, float]:
+    """Test mean(p) against samples of the same size drawn from the reference.
+
+    A KS test is not valid here. The reference distribution is atomic --
+    rounded summary statistics produce ties, and 11% of real baseline p-values
+    sit above 0.99 -- and KS against an atomic reference over-rejects badly:
+    it flags honest collections of 500 variables essentially always. Drawing
+    the null distribution from the reference itself costs nothing and holds
+    the false positive rate at the nominal level.
+
+    Comparing mean(p) is equivalent to comparing the area under the CDF, which
+    is the summary Bolland et al. use.
+    """
+    quantiles, cumulative = _carlisle_reference()
+    rng = np.random.default_rng(seed)
+    draws = np.interp(rng.random((simulations, len(p))), cumulative, quantiles)
+    null_means = draws.mean(axis=1)
+    observed = float(p.mean())
+    reference_mean = float(np.interp(np.linspace(0, 1, 20001), cumulative, quantiles).mean())
+    too_balanced = float((null_means >= observed).mean())
+    too_different = float((null_means <= observed).mean())
+    return too_balanced, too_different, reference_mean
 
 
 def _p_two_arms(a: tuple[float, float, float], b: tuple[float, float, float]) -> float | None:

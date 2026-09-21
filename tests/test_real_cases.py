@@ -154,19 +154,23 @@ def test_sato_reachable_p_values_are_not_flagged(sato: pd.DataFrame) -> None:
         assert entry["reported_p"] - tolerance <= entry["reachable_p_max"]
 
 
-def test_sato_carlisle_uniformity_does_not_fire_and_that_is_recorded(sato: pd.DataFrame) -> None:
+def test_sato_baseline_balance_does_not_fire_and_that_is_recorded(sato: pd.DataFrame) -> None:
     """A negative result on real fabricated data, pinned so it cannot drift silently.
 
     50 variables is a 10% sample of the set Bolland et al. analysed, and the
-    uniformity test is underpowered at that size. See the case's SOURCE.md. If
-    a change to the test makes this fire, that change needs justifying on its
-    own merits, not because it improved this number.
+    test has little power at that size. Note how small the excess is once the
+    right reference is used: 30% of these p-values exceed 0.8, against 23.7%
+    in real published trials -- not the 20% a uniform null would assume. See
+    the case's SOURCE.md. If a change makes this fire, that change needs
+    justifying on its own merits, not because it improved this number.
     """
     finding = baseline_summary_check(sato)
     assert finding.outcome == "clear"
     assert finding.details["variable_count"] == 50
-    assert finding.details["proportion_above_0_8"] == pytest.approx(0.30, abs=0.01)
-    assert finding.details["mean_baseline_p"] == pytest.approx(0.567, abs=0.005)
+    assert finding.details["observed_mean_p"] == pytest.approx(0.567, abs=0.005)
+    assert finding.details["reference_mean_p"] == pytest.approx(0.516, abs=0.005)
+    assert finding.details["observed_proportion_above_0_8"] == pytest.approx(0.30, abs=0.01)
+    assert finding.details["reference_proportion_above_0_8"] == pytest.approx(0.237, abs=0.005)
 
 
 def test_honest_summary_table_is_not_flagged() -> None:
