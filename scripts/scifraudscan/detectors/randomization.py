@@ -8,6 +8,14 @@ The uniformity assumption is only exactly true for independent baseline
 variables. Real baseline tables are correlated (height and weight, age and
 comorbidity), which makes the KS test anti-conservative, so a flag here is a
 reason to look, never a result to report on its own.
+
+Two entry points:
+
+- `carlisle_method` works from raw participant rows.
+- `baseline_summary_check` works from a published baseline table -- per-arm n,
+  mean and SD per variable. This is the case that actually arises when
+  screening a paper, since raw data is rarely available, and it is how
+  Carlisle and Bolland apply the method.
 """
 
 from __future__ import annotations
@@ -17,14 +25,16 @@ import pandas as pd
 from scipy import stats
 
 from scifraudscan.models import Finding, clear, flag, not_applicable
-from scifraudscan.utils import numeric_frame
+from scifraudscan.utils import decimal_places, numeric_frame, safe_float
 
 MIN_VARIABLES = 5
 MAX_CATEGORY_LEVELS = 20
 ALPHA = 0.01
 CAVEAT = (
     "Baseline variables are usually correlated, which violates the independence the "
-    "uniformity test assumes; treat a flag as a prompt to inspect, not as evidence."
+    "uniformity test assumes, and rounding of published summary statistics distorts "
+    "the p-value distribution away from exactly uniform (Bolland 2020). Treat a flag "
+    "as a prompt to inspect, not as evidence."
 )
 
 
@@ -94,7 +104,18 @@ def carlisle_method(df: pd.DataFrame, group_column: str | None = None) -> Findin
             variables=variables,
         )
 
-    p = np.array(p_values)
+    return _uniformity_finding(
+        check,
+        np.array(p_values),
+        {
+            "group_column": group_column,
+            "variable_count": len(p_values),
+            "variables": variables[:50],
+        },
+    )
+
+
+def _uniformity_finding(check: str, p: np.ndarray, extra: dict[str, object]) -> Finding:
     ks_p = float(stats.kstest(p, "uniform").pvalue)
     # Fabricated balance pushes baseline p-values toward 1, so a one-sided test
     # in that direction has more power than the two-sided test against it.
@@ -102,21 +123,19 @@ def carlisle_method(df: pd.DataFrame, group_column: str | None = None) -> Findin
     too_similar = int((p > 0.95).sum())
     too_different = int((p < 0.05).sum())
     shared = {
-        "group_column": group_column,
-        "variable_count": len(p_values),
+        **extra,
         "ks_p_value": float(f"{ks_p:.6g}"),
         "too_balanced_p_value": float(f"{too_balanced_p:.6g}"),
         "mean_baseline_p": round(float(p.mean()), 6),
         "count_above_0_95": too_similar,
         "count_below_0_05": too_different,
-        "variables": variables[:50],
         "caveat": CAVEAT,
     }
     best_p = min(ks_p, too_balanced_p)
     if best_p >= ALPHA:
         return clear(
             check,
-            f"{len(p_values)} baseline p-values are consistent with uniformity "
+            f"{len(p)} baseline p-values are consistent with uniformity "
             f"(two-sided KS p={ks_p:.3g}, too-balanced p={too_balanced_p:.3g}).",
             **shared,
         )
@@ -130,11 +149,197 @@ def carlisle_method(df: pd.DataFrame, group_column: str | None = None) -> Findin
     return flag(
         check,
         "high" if best_p < 0.001 else "moderate",
-        f"{len(p_values)} baseline p-values are not uniform: {detail}; "
+        f"{len(p)} baseline p-values are not uniform: {detail}; "
         f"{too_similar} are above .95 and {too_different} below .05.",
         **shared,
     )
 
 
+def baseline_pvalues_from_summary(table: pd.DataFrame) -> list[dict[str, object]]:
+    """One p-value per baseline variable, from per-arm n / mean / SD.
+
+    Expects columns study, var, and n1..n4 / m1..m4 / s1..s4 for as many arms
+    as the trial had. Two arms give a Welch t-test; three or four give a
+    one-way ANOVA reconstructed from the summary statistics.
+    """
+    results: list[dict[str, object]] = []
+    for index, row in table.iterrows():
+        arms = []
+        for arm in range(1, 5):
+            n = safe_float(row.get(f"n{arm}"))
+            mean = safe_float(row.get(f"m{arm}"))
+            sd = safe_float(row.get(f"s{arm}"))
+            if n is not None and mean is not None and sd is not None and n >= 2:
+                arms.append((n, mean, sd))
+        if len(arms) < 2 or all(sd <= 0 for _, _, sd in arms):
+            continue
+        p_value = _p_two_arms(*arms) if len(arms) == 2 else _p_many_arms(arms)
+        if p_value is None or not np.isfinite(p_value):
+            continue
+        results.append(
+            {
+                "row": int(index),
+                "study": str(row.get("study", "")),
+                "variable": str(row.get("var", "")),
+                "arms": len(arms),
+                "calculated_p": float(f"{p_value:.6g}"),
+                "reported_p": safe_float(row.get("p")),
+            }
+        )
+    return results
+
+
+def baseline_summary_check(table: pd.DataFrame) -> Finding:
+    """Carlisle's test applied to a published baseline table."""
+    check = "Carlisle Baseline Balance (published table)"
+    results = baseline_pvalues_from_summary(table)
+    if len(results) < MIN_VARIABLES:
+        return not_applicable(
+            check,
+            f"Only {len(results)} baseline variables could be computed from the table; "
+            f"{MIN_VARIABLES} are needed.",
+            variables=results,
+        )
+    p = np.array([r["calculated_p"] for r in results], dtype=float)
+    studies = sorted({r["study"] for r in results if r["study"]})
+    extra = {
+        "variable_count": len(p),
+        "study_count": len(studies) or None,
+        "proportion_above_0_8": round(float((p > 0.8).mean()), 4),
+        "variables": results[:100],
+    }
+    return _uniformity_finding(check, p, extra)
+
+
+def reported_baseline_p_check(table: pd.DataFrame) -> Finding:
+    """Is each printed baseline p-value reachable from the table it sits next to?
+
+    The reported p is compared against the full range of values obtainable from
+    the same row: every combination of the means and SDs at the edges of their
+    rounding intervals, under both Student's and Welch's t-test. A reported
+    value outside that range cannot have come from the summary statistics as
+    printed. Being generous about the test used and about rounding is what
+    keeps ordinary reporting choices from being flagged.
+    """
+    check = "Reported Baseline p-value Consistency"
+    checked: list[dict[str, object]] = []
+    for index, row in table.iterrows():
+        reported = safe_float(row.get("p"))
+        if reported is None:
+            continue
+        arms = [
+            (
+                safe_float(row.get(f"n{a}")),
+                safe_float(row.get(f"m{a}")),
+                safe_float(row.get(f"s{a}")),
+            )
+            for a in (1, 2)
+        ]
+        if any(v is None for arm in arms for v in arm) or any(n < 2 for n, _, _ in arms):
+            continue
+        bounds = _reachable_p_range(arms, row)
+        if bounds is None:
+            continue
+        low, high = bounds
+        # The reported p is itself rounded, so compare its rounding interval
+        # against the reachable range rather than the printed value alone.
+        tolerance = 0.5 * 10 ** -decimal_places(row.get("p"))
+        checked.append(
+            {
+                "row": int(index),
+                "study": str(row.get("study", "")),
+                "variable": str(row.get("var", "")),
+                "reported_p": reported,
+                "reported_p_tolerance": tolerance,
+                "reachable_p_min": round(low, 6),
+                "reachable_p_max": round(high, 6),
+                "unreachable": bool(
+                    reported + tolerance < low - 1e-9 or reported - tolerance > high + 1e-9
+                ),
+            }
+        )
+
+    if not checked:
+        return not_applicable(
+            check, "No two-arm row supplied a reported p-value alongside n, mean and SD."
+        )
+    unreachable = [c for c in checked if c["unreachable"]]
+    if not unreachable:
+        return clear(
+            check,
+            f"All {len(checked)} reported baseline p-values are reachable from the "
+            "summary statistics printed beside them.",
+            n_checked=len(checked),
+            variables=checked[:100],
+        )
+    rate = len(unreachable) / len(checked)
+    return flag(
+        check,
+        "high" if rate > 0.2 else "moderate",
+        f"{len(unreachable)} of {len(checked)} reported baseline p-values cannot be produced "
+        "by the means and SDs printed in the same row, under any rounding and either "
+        "form of the t-test.",
+        n_checked=len(checked),
+        unreachable_count=len(unreachable),
+        unreachable=unreachable[:100],
+        variables=checked[:100],
+    )
+
+
 def run_randomization_checks(df: pd.DataFrame, group_column: str | None = None) -> list[Finding]:
     return [carlisle_method(df, group_column)]
+
+
+def _reachable_p_range(
+    arms: list[tuple[float, float, float]], row: pd.Series
+) -> tuple[float, float] | None:
+    """Every p obtainable from these summary statistics, given how they were rounded."""
+    deltas = []
+    for arm in (1, 2):
+        deltas.append(
+            (
+                0.5 * 10 ** -decimal_places(row.get(f"m{arm}")),
+                0.5 * 10 ** -decimal_places(row.get(f"s{arm}")),
+            )
+        )
+    values: list[float] = []
+    for dm1 in (-1, 1):
+        for ds1 in (-1, 1):
+            for dm2 in (-1, 1):
+                for ds2 in (-1, 1):
+                    n1, m1, s1 = arms[0]
+                    n2, m2, s2 = arms[1]
+                    m1 += dm1 * deltas[0][0]
+                    s1 = max(1e-9, s1 + ds1 * deltas[0][1])
+                    m2 += dm2 * deltas[1][0]
+                    s2 = max(1e-9, s2 + ds2 * deltas[1][1])
+                    for equal_var in (True, False):
+                        result = stats.ttest_ind_from_stats(
+                            m1, s1, int(n1), m2, s2, int(n2), equal_var=equal_var
+                        )
+                        if np.isfinite(result.pvalue):
+                            values.append(float(result.pvalue))
+    if not values:
+        return None
+    return min(values), max(values)
+
+
+def _p_two_arms(a: tuple[float, float, float], b: tuple[float, float, float]) -> float | None:
+    (n1, m1, s1), (n2, m2, s2) = a, b
+    return float(
+        stats.ttest_ind_from_stats(m1, s1, int(n1), m2, s2, int(n2), equal_var=False).pvalue
+    )
+
+
+def _p_many_arms(arms: list[tuple[float, float, float]]) -> float | None:
+    """One-way ANOVA reconstructed from group sizes, means and SDs."""
+    total = sum(n for n, _, _ in arms)
+    k = len(arms)
+    if total <= k:
+        return None
+    grand_mean = sum(n * m for n, m, _ in arms) / total
+    between = sum(n * (m - grand_mean) ** 2 for n, m, _ in arms) / (k - 1)
+    within = sum((n - 1) * sd**2 for n, _, sd in arms) / (total - k)
+    if within <= 0:
+        return None
+    return float(stats.f.sf(between / within, k - 1, total - k))

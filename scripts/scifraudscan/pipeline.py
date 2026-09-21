@@ -15,7 +15,11 @@ from scifraudscan.detectors.authenticity import index_like_columns, run_authenti
 from scifraudscan.detectors.covariance import run_covariance_checks
 from scifraudscan.detectors.duplication import run_duplication_checks
 from scifraudscan.detectors.pvalues import run_p_value_checks
-from scifraudscan.detectors.randomization import run_randomization_checks
+from scifraudscan.detectors.randomization import (
+    baseline_summary_check,
+    reported_baseline_p_check,
+    run_randomization_checks,
+)
 from scifraudscan.detectors.reported_stats import validate_reported_stats
 from scifraudscan.detectors.structure import run_structure_checks
 from scifraudscan.detectors.timeseries import run_timeseries_checks
@@ -30,6 +34,7 @@ CHECK_GROUPS: tuple[str, ...] = (
     "timeseries",
     "reported_stats",
     "pvalues",
+    "baseline",
 )
 
 DATA_GROUPS = frozenset({"authenticity", "duplication", "structure", "randomization",
@@ -42,6 +47,7 @@ def scan(
     groups: list[str] | tuple[str, ...] | None = None,
     reported_stats: pd.DataFrame | None = None,
     p_values: pd.DataFrame | None = None,
+    baseline_summary: pd.DataFrame | None = None,
     group_column: str | None = None,
     time_column: str | None = None,
     assumed_power: float = 0.5,
@@ -60,6 +66,10 @@ def scan(
         "timeseries": lambda: run_timeseries_checks(df, time_column),
         "reported_stats": lambda: validate_reported_stats(reported_stats),
         "pvalues": lambda: run_p_value_checks(p_values, assumed_power),
+        "baseline": lambda: [
+            baseline_summary_check(baseline_summary),
+            reported_baseline_p_check(baseline_summary),
+        ],
     }
 
     sections: list[dict[str, Any]] = []
@@ -69,6 +79,8 @@ def scan(
         if name == "reported_stats" and reported_stats is None:
             continue
         if name == "pvalues" and p_values is None:
+            continue
+        if name == "baseline" and baseline_summary is None:
             continue
         findings = runners[name]()
         sections.append({"group": name, "findings": [f.as_dict() for f in findings]})

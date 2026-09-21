@@ -77,21 +77,32 @@ honest data of the same shape.
 papers whose numbers have already been examined in the peer-reviewed
 literature, cell by cell, against the verdicts that reanalysis reached:
 
-| Case | Status | Cells | Agreement |
+| Case | Status | What is checked | Result |
 |---|---|---|---|
-| Sigirci & Wansink (2015), *BMC Nutrition* | **Retracted** 2017 | 30 means, 20 SDs | 30/30, 20/20 |
-| Just, Sigirci & Wansink (2014), *J Sensory Studies* | Corrected 2017 | 28 | 28/28 |
+| Sigirci & Wansink (2015), *BMC Nutrition* | **Retracted** 2017 | GRIM / GRIMMER, 30 means + 20 SDs | 30/30, 20/20 match published verdicts |
+| Just, Sigirci & Wansink (2014), *J Sensory Studies* | Corrected 2017 | GRIM / GRIMMER, 28 cells | 28/28 match published verdicts |
+| Sato / Iwamoto trials | **Retracted** (20+ papers) | Baseline tables, 50 variables | 5 of 10 printed p-values unreachable; Carlisle uniformity **does not fire** |
 
-Expected verdicts come from [van der Zee, Anaya & Brown (2017)](https://doi.org/10.1186/s40795-017-0167-x),
-cross-checked against the means and SDs in the reanalysis authors'
-[own repository](https://github.com/OmnesRes/pizzapizza). Half of these cells
-are values that reanalysis found *consistent*, so they test the false-positive
-side too. Each case's `SOURCE.md` records the DOIs, the editorial outcome, and
-where every number came from.
+The Wansink verdicts come from [van der Zee, Anaya & Brown (2017)](https://doi.org/10.1186/s40795-017-0167-x),
+cross-checked against the reanalysis authors'
+[own repository](https://github.com/OmnesRes/pizzapizza). The Sato/Iwamoto
+baseline data is the `SI_pvals_cont` dataset from Mark Bolland's MIT-licensed
+[reappraised](https://cran.r-project.org/package=reappraised) package. About
+half of all these cells are values that should *not* be flagged, so the
+false-positive side is tested too. Each case's `SOURCE.md` records the DOIs,
+the editorial outcome, and where every number came from.
 
-This is still narrow: it validates GRIM and GRIMMER on two papers from one
-lab. It is not a general false positive rate, and the data-side checks
-(duplication, digits, Carlisle) have no real-case validation at all.
+**The Sato case includes a negative result and it is kept.** On those 50
+baseline variables the Carlisle uniformity test returns `clear` (mean p =
+0.567 against 0.500 expected; KS p = 0.37): a 10% sample is too small for the
+test to have power, and the published method uses a simulated reference
+rather than an exactly uniform one. No threshold was moved to make it fire.
+The p-value reachability check, which assumes nothing about the distribution,
+carried that case instead.
+
+Still narrow: the arithmetic checks are validated on three real cases from two
+research groups. Duplication, digit preference and the sequential checks have
+no real-case validation, and there is no general false positive rate.
 
 ## Limitations
 

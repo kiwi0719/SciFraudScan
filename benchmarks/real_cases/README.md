@@ -13,7 +13,8 @@ anyone reading this.
 
 ## What each case directory holds
 
-- `reported_stats.csv` — the statistics exactly as the paper printed them,
+- `reported_stats.csv` or `baseline_summary.csv` — the statistics exactly as
+  published,
   with the sample size for each cell, plus a `published_*_verdict` column
   giving the published reanalysis's conclusion for that cell.
 - `SOURCE.md` — the paper, the reanalysis, the editorial outcome, where every
@@ -32,3 +33,6 @@ reanalysis found *consistent* are the false-positive controls.
   correction, a retraction as a retraction. They are not the same thing.
 - Cases are included because their numbers are public and already analyzed,
   not as a judgement about the people involved.
+- **Negative results stay.** Where a check fails to detect something a
+  published analysis did detect, the case records that and explains why. No
+  threshold in this toolkit has been moved to improve a number on this page.
