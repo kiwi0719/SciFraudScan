@@ -79,6 +79,7 @@ def scan(
     group_column: str | None = None,
     time_column: str | None = None,
     assumed_power: float = 0.5,
+    benford_scale_invariant: bool = False,
     include_experimental: bool = False,
 ) -> dict[str, Any]:
     if groups:
@@ -92,7 +93,7 @@ def scan(
         raise ValueError(f"Unknown check groups: {', '.join(unknown)}")
 
     runners: dict[str, Callable[[], list[Finding]]] = {
-        "authenticity": lambda: run_authenticity_checks(df),
+        "authenticity": lambda: run_authenticity_checks(df, benford_scale_invariant),
         "duplication": lambda: run_duplication_checks(df),
         "structure": lambda: run_structure_checks(df),
         "randomization": lambda: run_randomization_checks(df, group_column),

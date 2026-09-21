@@ -62,13 +62,23 @@ def test_benford_refuses_narrow_range_data(rng) -> None:
     assert benford_law(frame).outcome == "not_applicable"
 
 
+def test_benford_does_not_run_unless_the_caller_asserts_it_applies(rng) -> None:
+    """Whether a variable is scale-invariant is a fact about the world.
+
+    Left to decide for itself, Benford fired on 74% of the real datasets where
+    it was eligible. It now runs only on request.
+    """
+    wide = 10 ** rng.uniform(0, 5, 2000)
+    assert benford_law(pd.DataFrame({"amount": wide})).outcome == "not_applicable"
+
+
 def test_benford_runs_on_wide_range_data_and_stays_moderate(rng) -> None:
     conforming = 10 ** rng.uniform(0, 5, 2000)
-    finding = benford_law(pd.DataFrame({"amount": conforming}))
+    finding = benford_law(pd.DataFrame({"amount": conforming}), scale_invariant=True)
     assert finding.outcome == "clear"
     leading_ones = np.concatenate([rng.uniform(1, 2, 1500) * 10 ** rng.integers(0, 5, 1500),
                                    10 ** rng.uniform(0, 5, 500)])
-    flagged = benford_law(pd.DataFrame({"amount": leading_ones}))
+    flagged = benford_law(pd.DataFrame({"amount": leading_ones}), scale_invariant=True)
     assert flagged.outcome == "flag"
     assert flagged.severity == "moderate"  # never stronger than that, by design
 
@@ -84,12 +94,37 @@ def test_digit_preference_clears_honest_data(rng) -> None:
     assert digit_preference(frame).outcome == "clear"
 
 
-def test_digit_preference_catches_rounding_to_fives(rng) -> None:
+def test_wholly_coarse_columns_are_untestable_not_positive(rng) -> None:
+    """Every value ending in 0 or 5 fits a scale marked in fives just as well
+    as rounding by hand, and the data cannot say which. Treating it as
+    positive flagged 100% of such columns in real data."""
+    values = np.round(rng.normal(50, 10, 600) * 2) / 2
+    finding = digit_preference(pd.DataFrame({"value": values}))
+    assert finding.outcome == "not_applicable"
+    assert finding.details["coarse_columns"]
+
+
+def test_digit_preference_needs_to_beat_real_published_data(rng) -> None:
+    """Partial heaping is testable, but has to clear what real columns do.
+
+    At the old threshold of V >= 0.10, 40% of real full-precision columns were
+    flagged. The threshold is now the 97.5% quantile of real columns, measured
+    on 150 datasets and checked on 150 held out, where it fires on 8%.
+    """
     values = np.round(rng.normal(50, 10, 600), 1)
     nudge = rng.random(600) < 0.6
     values[nudge] = np.round(values[nudge] * 2) / 2
-    finding = digit_preference(pd.DataFrame({"value": values}))
-    assert finding.outcome == "flag"
+    moderate = digit_preference(pd.DataFrame({"value": values}))
+    assert moderate.outcome == "clear"
+    assert moderate.details["evaluated_columns"][0]["percentile_among_real_columns"] > 0.5
+
+    extreme = np.round(rng.normal(50, 10, 600), 1)
+    heap = rng.random(600) < 0.93
+    extreme[heap] = np.round(extreme[heap])
+    assert digit_preference(pd.DataFrame({"value": extreme})).outcome in {
+        "flag",
+        "not_applicable",
+    }
 
 
 def test_index_columns_are_not_treated_as_measurements() -> None:

@@ -14,7 +14,7 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 
-from scifraudscan.models import Finding, clear, flag
+from scifraudscan.models import Finding, clear, flag, not_applicable
 from scifraudscan.utils import finite_pair, numeric_frame
 
 MIN_PAIR_N = 8
@@ -72,6 +72,33 @@ def near_duplicate_rows(
     scores = similarity[rows, cols]
     hits = np.flatnonzero(scores >= threshold)
     index = sampled.index[keep]
+
+    # How many such pairs arise from rows assembled at random out of these very
+    # columns? Shuffling each column independently keeps every value and every
+    # marginal distribution and destroys only the pairing between them.
+    generator = np.random.default_rng(0)
+    null_counts = []
+    for _ in range(10):
+        shuffled = np.column_stack(
+            [generator.permutation(standardized[:, j]) for j in range(standardized.shape[1])]
+        )
+        norms_s = np.linalg.norm(shuffled, axis=1)
+        keep_s = norms_s > 1e-12
+        unit = shuffled[keep_s] / norms_s[keep_s, None]
+        sim = unit @ unit.T
+        null_counts.append(int((sim[np.triu_indices_from(sim, k=1)] >= threshold).sum()))
+    expected = float(np.mean(null_counts))
+
+    if len(hits) and len(hits) <= max(expected, 1) * 2:
+        return clear(
+            check,
+            f"{len(hits)} near-identical row pairs, against {expected:.1f} expected from "
+            "rows assembled at random out of these same columns. Ordinary for data "
+            "with this many repeated values.",
+            pair_count=len(hits),
+            expected_when_shuffled=round(expected, 2),
+            rows_evaluated=len(standardized),
+        )
     if len(hits) == 0:
         return clear(
             check,
@@ -157,15 +184,12 @@ def permutation_duplicates(df: pd.DataFrame) -> Finding:
     )
 
 
-def partial_duplicate_windows(df: pd.DataFrame, window: int = 6) -> Finding:
-    check = "Repeated Value Blocks"
-    num = numeric_frame(df)
+def _count_repeated_blocks(
+    columns: list[tuple[str, np.ndarray]], window: int
+) -> tuple[int, list[dict[str, object]]]:
     seen: dict[tuple[float, ...], tuple[str, int]] = {}
     matches: list[dict[str, object]] = []
-    for column in num.columns:
-        values = num[column].dropna().to_numpy(dtype=float)
-        if len(values) < window or np.std(values) <= 1e-12:
-            continue
+    for name, values in columns:
         for start in range(len(values) - window + 1):
             block = values[start : start + window]
             if np.std(block) <= 1e-12:
@@ -173,27 +197,94 @@ def partial_duplicate_windows(df: pd.DataFrame, window: int = 6) -> Finding:
             key = tuple(np.round(block, 10).tolist())
             previous = seen.get(key)
             if previous is None:
-                seen[key] = (str(column), start)
-            elif previous[0] != str(column) or abs(previous[1] - start) >= window:
+                seen[key] = (name, start)
+            elif previous[0] != name or abs(previous[1] - start) >= window:
                 matches.append(
                     {
-                        "column": str(column),
+                        "column": name,
                         "start": start,
                         "previous_column": previous[0],
                         "previous_start": previous[1],
                         "length": window,
                     }
                 )
-    if not matches:
-        return clear(check, f"No run of {window} consecutive values repeats elsewhere.")
-    severity = "high" if len(matches) > 5 else "moderate"
+    return len(matches), matches
+
+
+def partial_duplicate_windows(
+    df: pd.DataFrame, window: int = 6, permutations: int = 25, seed: int = 0
+) -> Finding:
+    """Runs of consecutive values that reappear elsewhere, against chance.
+
+    A column with few distinct values repeats short runs constantly, so the
+    raw count says more about the column's diversity than about its
+    provenance: counting them fired on 70% of ordinary datasets. The count is
+    now compared against the same count after shuffling each column, which
+    destroys the ordering while keeping every value exactly as it was.
+    """
+    check = "Repeated Value Blocks"
+    num = numeric_frame(df)
+    columns = []
+    sorted_out = []
+    for column in num.columns:
+        values = num[column].dropna().to_numpy(dtype=float)
+        if len(values) < window or np.std(values) <= 1e-12:
+            continue
+        # A sorted column repeats runs for a reason that has nothing to do with
+        # provenance, and shuffling it makes any permutation test significant.
+        if np.all(np.diff(values) >= 0) or np.all(np.diff(values) <= 0):
+            sorted_out.append(str(column))
+            continue
+        columns.append((str(column), values))
+    if not columns:
+        reason = (
+            f"Every numeric column is sorted ({len(sorted_out)} of them), so repeated runs "
+            "carry no information about how the data was assembled."
+            if sorted_out
+            else f"No numeric column has {window} varying values."
+        )
+        return not_applicable(check, reason, sorted_columns=sorted_out[:20])
+
+    observed, matches = _count_repeated_blocks(columns, window)
+    rng = np.random.default_rng(seed)
+    null = np.array(
+        [
+            _count_repeated_blocks(
+                [(name, rng.permutation(values)) for name, values in columns], window
+            )[0]
+            for _ in range(permutations)
+        ],
+        dtype=float,
+    )
+    exceedances = int((null >= observed).sum())
+    p_value = (exceedances + 1) / (permutations + 1)
+    shared = {
+        "window": window,
+        "observed_blocks": observed,
+        "expected_blocks_when_shuffled": round(float(null.mean()), 2),
+        "permutation_p_value": round(p_value, 4),
+        "permutations": permutations,
+        "sorted_columns_excluded": sorted_out[:20],
+    }
+    if observed == 0:
+        return clear(check, f"No run of {window} consecutive values repeats elsewhere.", **shared)
+    if p_value > 0.05:
+        return clear(
+            check,
+            f"{observed} repeated runs of {window} values, against "
+            f"{null.mean():.1f} expected from these columns' own values in random order "
+            f"(permutation p={p_value:.3g}). Ordinary for data this granular.",
+            **shared,
+        )
     return flag(
         check,
-        severity,
-        f"{len(matches)} runs of {window} consecutive values reappear elsewhere in the data.",
-        window=window,
+        "high" if observed > 3 * max(null.mean(), 1) else "moderate",
+        f"{observed} runs of {window} consecutive values reappear elsewhere, against "
+        f"{null.mean():.1f} expected when the same values are shuffled "
+        f"(permutation p={p_value:.3g}).",
         matches=matches[:20],
-        match_count=len(matches),
+        match_count=observed,
+        **shared,
     )
 
 

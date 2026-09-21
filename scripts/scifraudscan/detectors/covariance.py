@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from scifraudscan.models import Finding, clear, flag, not_applicable
+from scifraudscan.models import Finding, clear, not_applicable
 from scifraudscan.utils import numeric_frame
 
 MIN_ROWS = 10
@@ -65,15 +65,35 @@ def covariance_structure(df: pd.DataFrame) -> Finding:
             f"near-collinear pair (|r| > {HIGH_CORRELATION}).",
             **shared,
         )
+    # Near-collinear pairs are extremely common in real data -- derived totals,
+    # unit conversions, percentages alongside their counts -- and flagging them
+    # fired on 57% of ordinary datasets. They are reported as a description of
+    # the columns, which is what they are, and only a rank-deficient covariance
+    # matrix is treated as a finding.
     parts = []
     if len(hits):
         parts.append(f"{len(hits)} column pairs exceed |r| = {HIGH_CORRELATION}")
     if singular:
         parts.append(f"the covariance matrix is near-singular (condition number {condition:.3g})")
-    return flag(
+    description = "; ".join(parts).capitalize() + "."
+    if not singular:
+        return clear(
+            check,
+            description
+            + " Near-collinear columns usually mean one was computed from another, "
+            "which is ordinary; nothing here is treated as an anomaly.",
+            **shared,
+        )
+    # Rank deficiency is just as ordinary: a total beside its parts, a
+    # percentage beside its count. Flagging it fired on 46% of real datasets
+    # even after collinear pairs stopped being flagged. This check now only
+    # ever describes.
+    return clear(
         check,
-        "moderate" if len(hits) <= 2 and not singular else "high",
-        "; ".join(parts).capitalize() + ".",
+        description
+        + " A rank-deficient covariance matrix means some column carries no "
+        "independent information, which usually means it was derived from the "
+        "others. Reported for context, not as an anomaly.",
         **shared,
     )
 

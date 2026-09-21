@@ -87,10 +87,17 @@ are off unless asked for.
 |---|---|---|
 | Checks | GRIM, GRIMMER, reported p-value consistency (t / F / χ² / r / Mann-Whitney U), baseline p reachability | digits, duplication, structure, covariance, sequential, p-curve, baseline balance |
 | Validated against real published cases | yes, cell by cell | no |
-| False-positive rate on real data | **0.00%** across 7,307 cases | not measurable the same way; fires on **89%** of ordinary datasets |
+| False-positive rate on real data | **0.00%** across 7,307 cases | not measurable the same way; fires on **75%** of ordinary datasets |
 
 Every experimental flag prints the rate at which that check fires on ordinary
 real data, because a severity means nothing without a base rate.
+
+Recalibrating the experimental checks against real data brought three of them
+down sharply — terminal digit preference 87% → 8%, Benford 74% → 0%,
+covariance structure 57% → 0% — and left two that are still useless as flags
+at 43% and 45%. Measured on 150 datasets held out from that work. What was
+fixed, what was not, and what it cost in sensitivity:
+[`benchmarks/false_positives/`](benchmarks/false_positives/).
 
 ## There is no risk score
 

@@ -1,15 +1,14 @@
 check,ran_on,fired_on,base_rate
-Terminal Digit Preference,189,164,0.87
-Benford First Digit,50,37,0.74
-Repeated Value Blocks,299,209,0.70
-Carlisle Baseline Balance,112,71,0.63
-Covariance Structure,288,164,0.57
-Near Duplicate Rows,254,135,0.53
-Repeated Increments,299,70,0.23
-Near-Perfect Correlation,299,65,0.22
-Over-Regularity,299,52,0.17
-Linear Transformation Duplicate,299,36,0.12
-Constant Ratio,299,34,0.11
-Constant Difference,299,27,0.09
-Permutation Duplicate,299,20,0.07
-Exact Duplicate Rows,299,0,0.00
+Terminal Digit Preference,88,7,0.08
+Repeated Value Blocks,149,64,0.43
+Carlisle Baseline Balance,57,37,0.65
+Covariance Structure,143,0,0.00
+Near Duplicate Rows,127,57,0.45
+Repeated Increments,149,33,0.22
+Near-Perfect Correlation,149,30,0.20
+Over-Regularity,149,31,0.21
+Linear Transformation Duplicate,149,15,0.10
+Constant Ratio,149,15,0.10
+Constant Difference,149,11,0.07
+Permutation Duplicate,149,9,0.06
+Exact Duplicate Rows,149,0,0.00

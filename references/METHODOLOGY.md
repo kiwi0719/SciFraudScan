@@ -15,11 +15,20 @@ cases; false-positive rate **0 in 7,307** statistics computed from real raw
 data.
 
 **Experimental:** everything else, off unless `--experimental` is passed.
-Measured on 300 ordinary real datasets, terminal-digit preference fires on
-87% of them and Benford on 74%, and 89% of those datasets draw at least one
-experimental flag. A check with an 87% base rate tells you almost nothing when
-it fires on your data, so every experimental flag now prints its measured rate
-beside it. Full table in `benchmarks/false_positives/README.md`.
+Recalibrating these against real data — theoretical nulls replaced by
+empirical ones, premises that cannot be checked turned into explicit opt-ins —
+took the share of ordinary datasets drawing at least one flag from 89% to 75%,
+measured on 150 datasets held out from the recalibration.
+
+Three are now usable: terminal digit preference 87% → 8%, Benford 74% → 0%
+(it runs only when the caller asserts the variable is scale-invariant),
+covariance structure 57% → 0% (it now only describes). Two are not: repeated
+value blocks at 43% and near duplicate rows at 45%, because the permutation
+null they use destroys legitimate ordering and answers the wrong question.
+
+Every experimental flag prints its measured rate beside it. Full table, and
+what the digit fix cost in sensitivity, in
+`benchmarks/false_positives/README.md`.
 
 These rates are not proof the checks are wrong — ordinary data does contain
 derived columns and repeated blocks. They are proof that a flag from them is

@@ -10,8 +10,12 @@ import pandas as pd
 import pytest
 from scifraudscan.pipeline import scan
 
+# Terminal digit preference is deliberately absent. The planted heaping in
+# outcome_score sits at the 94th percentile of real published columns, and a
+# threshold low enough to catch it flags 8% of ordinary data. Real data heaps
+# on 0 and 5 as hard as this fabrication does; see
+# benchmarks/false_positives/README.md.
 EXPECTED_ON_FABRICATED = {
-    "Terminal Digit Preference",
     "Linear Transformation Duplicate",
     "Repeated Value Blocks",
     "Carlisle Baseline Balance",
