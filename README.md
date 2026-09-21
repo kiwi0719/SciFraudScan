@@ -1,5 +1,8 @@
 # SciFraudScan
 
+[![CI](https://github.com/kiwi0719/SciFraudScan/actions/workflows/ci.yml/badge.svg)](https://github.com/kiwi0719/SciFraudScan/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A Claude skill for screening research data and reported statistics for
 anomaly signals: impossible means and SDs, p-values that disagree with their
 test statistics, duplicated or derived columns, digit preference, implausible
@@ -25,6 +28,38 @@ python scripts/scan.py examples/fabricated_trial.csv \
   --reported-stats examples/reported_stats.csv \
   --p-values examples/p_values.csv
 ```
+
+Every report carries the version that produced it, so a finding can be traced
+back to a build:
+
+```
+$ python scripts/scan.py --reported-stats table1.csv
+SciFraudScan 0.2.0
+============================================================
+
+Input: 0 rows, 0 columns, 30 reported-statistic rows
+Result: 2 flagged, 0 clear, 1 not applicable (highest severity: high)
+
+Reported statistics
+------------------------------------------------------------
+[FLAG] GRIM (high)
+        10 of 30 reported means cannot arise from N responses on the stated scale.
+          failures:
+            - {'row': 0, 'n': 18, 'reported_mean': 2.63, 'decimals': 2, 'reason': 'no set of n responses rounds to this mean'}
+            ... 9 more
+[FLAG] SD Feasibility (GRIMMER / variance bounds) (high)
+        8 of 20 testable mean/SD pairs are impossible; an SD is testable only
+        where the mean itself is attainable.
+[n/a]  Reported p-value Consistency
+        No row supplied a test statistic, its df and a reported p-value.
+
+------------------------------------------------------------
+These are statistical screening signals, not findings of misconduct. Every flag
+has innocent explanations and must be checked against the study's methods
+before it means anything.
+```
+
+That is real output, from the retracted paper in `benchmarks/real_cases/`.
 
 ## What it checks
 
@@ -120,6 +155,13 @@ full SPRITE search. The p-value checks need a body of results, not one study.
 Roughly 22 checks run without correction for multiple comparisons, so some
 flags on honest data are expected — severity and the per-check failure modes
 matter far more than the count.
+
+## Citing this
+
+`CITATION.cff` has the metadata. If you use it in published work, cite the
+original methods too — they are listed with their sources in
+[`references/METHODOLOGY.md`](references/METHODOLOGY.md). This is an
+implementation of other people's statistics.
 
 ## License
 

@@ -32,3 +32,13 @@ def test_not_applicable_carries_the_reason_in_the_message() -> None:
     finding = not_applicable("X", "needs 100 rows, got 4")
     assert finding.outcome == "not_applicable"
     assert "needs 100 rows" in finding.message
+
+
+def test_every_report_carries_the_version_that_produced_it() -> None:
+    """A finding has to be traceable to a build, since the thresholds change."""
+    import pandas as pd
+    from scifraudscan._version import __version__
+    from scifraudscan.pipeline import scan
+
+    result = scan(pd.DataFrame({"a": [1.0, 2.0, 3.0]}), groups=["duplication"])
+    assert result["scifraudscan_version"] == __version__

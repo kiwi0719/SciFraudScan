@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+title: SciFraudScan
+message: >-
+  If you use this toolkit in work you publish, please cite it, and cite the
+  original methods it implements as well. The methods are listed in
+  references/METHODOLOGY.md; this software only implements them.
+type: software
+authors:
+  - family-names: Shi
+    given-names: Jiwei
+repository-code: "https://github.com/kiwi0719/SciFraudScan"
+abstract: >-
+  Statistical screening for research data anomalies: GRIM and GRIMMER
+  feasibility of reported means and SDs, recomputation of reported p-values,
+  duplication and derived columns, terminal-digit preference, Carlisle-style
+  baseline balance against an empirical reference, p-curve and caliper tests.
+  Produces screening signals for triage, not findings of misconduct.
+keywords:
+  - research integrity
+  - scientific fraud
+  - data forensics
+  - GRIM
+  - GRIMMER
+  - p-curve
+license: MIT
+version: 0.2.0
+date-released: "2026-09-21"
