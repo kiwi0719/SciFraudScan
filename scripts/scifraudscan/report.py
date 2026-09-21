@@ -14,12 +14,15 @@ GROUP_TITLES = {
     "timeseries": "Sequential structure",
     "reported_stats": "Reported statistics",
     "pvalues": "P-value distribution",
-    "baseline": "Published baseline table",
+    "baseline_p": "Published baseline table — reported p-values",
+    "baseline_balance": "Published baseline table — balance",
 }
 DISCLAIMER = (
     "These are statistical screening signals, not findings of misconduct. Every flag has "
     "innocent explanations and must be checked against the study's methods before it means "
-    "anything."
+    "anything. A clear result is not reassurance either: these checks test whether numbers "
+    "are consistent with each other, and fabricated data processed by software is "
+    "consistent with itself."
 )
 
 
@@ -53,13 +56,47 @@ def render_text(result: dict[str, Any], show_details: bool = True) -> str:
     )
     lines.append("")
 
-    for section in result["sections"]:
-        lines.append(GROUP_TITLES.get(section["group"], section["group"]))
+    if not result["sections"]:
+        lines.append("Nothing was run.")
         lines.append("-" * 60)
+        lines.append(
+            "The checks that run by default are the arithmetic ones, and they work from"
+        )
+        lines.append(
+            "statistics as a paper reports them: --reported-stats for means, SDs and test"
+        )
+        lines.append(
+            "statistics, --baseline-summary for a trial's baseline table. A raw dataset on"
+        )
+        lines.append(
+            "its own reaches only the experimental checks; pass --experimental to run those,"
+        )
+        lines.append("having read what that means in references/METHODOLOGY.md.")
+        lines.append("")
+        lines.append("-" * 60)
+        lines.append(DISCLAIMER)
+        return "\n".join(lines)
+
+    for section in result["sections"]:
+        experimental = section.get("validation", "").startswith("none")
+        title = GROUP_TITLES.get(section["group"], section["group"])
+        lines.append(f"{title}   [EXPERIMENTAL]" if experimental else title)
+        lines.append("-" * 60)
+        if experimental:
+            lines.append(
+                "        No real-case validation: how often these fire on sound data"
+            )
+            lines.append("        is not known. Weigh them accordingly.")
         for finding in section["findings"]:
             marker = MARKERS.get(finding["outcome"], "      ")
             severity = f" ({finding['severity']})" if finding.get("severity") else ""
             lines.append(f"{marker} {finding['check']}{severity}")
+            rate = finding.get("fires_on_ordinary_data")
+            if rate is not None and finding["outcome"] == "flag":
+                lines.append(
+                    f"        NOTE: this check fires on {rate:.0%} of ordinary real "
+                    "datasets that have nothing to do with misconduct."
+                )
             lines.append(f"        {finding['message']}")
             if show_details and finding["outcome"] == "flag":
                 lines.extend(_detail_lines(finding.get("details", {})))

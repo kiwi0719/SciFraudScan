@@ -78,6 +78,20 @@ The reported-statistics checks need no raw data — only the numbers printed in
 the paper — and are the only ones that can show a result is *impossible*
 rather than merely unusual.
 
+## Two layers
+
+The checks that run by default are the ones with measured behaviour. The rest
+are off unless asked for.
+
+| | Default | `--experimental` |
+|---|---|---|
+| Checks | GRIM, GRIMMER, reported p-value consistency (t / F / χ² / r / Mann-Whitney U), baseline p reachability | digits, duplication, structure, covariance, sequential, p-curve, baseline balance |
+| Validated against real published cases | yes, cell by cell | no |
+| False-positive rate on real data | **0.00%** across 7,307 cases | not measurable the same way; fires on **89%** of ordinary datasets |
+
+Every experimental flag prints the rate at which that check fires on ordinary
+real data, because a severity means nothing without a base rate.
+
 ## There is no risk score
 
 Every check returns `flag`, `clear`, or `not_applicable`, with the numbers
@@ -105,6 +119,33 @@ python benchmarks/generate_examples.py   # regenerate from a fixed seed
 
 This shows the checks fire on what they claim to detect and stay quiet on
 honest data of the same shape.
+
+### False-positive rate
+
+Measuring one normally needs data known to be sound. Instead: take real raw
+data, compute the summary statistics yourself, round them as a paper would,
+and every flag is then a **demonstrable** false positive.
+
+| Check | Cases | False positives |
+|---|---|---|
+| GRIM | 2674 | **0** |
+| GRIMMER | 2674 | **0** |
+| Reported p (Student t) | 653 | **0** |
+| Reported p (Mann-Whitney U) | 653 | **0** |
+| Baseline p reachability | 653 | **0** |
+
+Over 300 real datasets from [Rdatasets](https://vincentarelbundock.github.io/Rdatasets/).
+Getting to zero required two fixes this measurement found: a rounding
+convention that made GRIM reject reachable means, and float precision loss
+above ~1e13. See [`benchmarks/false_positives/`](benchmarks/false_positives/).
+
+### Agreement with an independent implementation
+
+GRIM agrees with **scrutiny 0.6.1**, the R reference implementation, on
+**6000/6000** cases. GRIMMER is the weaker test: scrutiny rejects 2.6% more
+pairs, and there is no case where this rejects and scrutiny does not. **If you
+need GRIMMER at full strength, use scrutiny.** See
+[`benchmarks/crosscheck/`](benchmarks/crosscheck/).
 
 ### Real published cases
 

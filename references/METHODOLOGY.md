@@ -3,6 +3,28 @@
 What each check tests, what it needs to run, what makes it fire, and how it
 fails. Read the "fails when" column before repeating any result to anyone.
 
+## Two layers, and why
+
+The checks divide into those whose behaviour has been measured and those whose
+has not. Only the first run by default.
+
+**Validated:** GRIM, GRIMMER, reported p-value consistency, baseline p
+reachability. Verdicts reproduced cell by cell against published reanalyses
+of real papers; GRIM additionally agrees with scrutiny 0.6.1 on 6000/6000
+cases; false-positive rate **0 in 7,307** statistics computed from real raw
+data.
+
+**Experimental:** everything else, off unless `--experimental` is passed.
+Measured on 300 ordinary real datasets, terminal-digit preference fires on
+87% of them and Benford on 74%, and 89% of those datasets draw at least one
+experimental flag. A check with an 87% base rate tells you almost nothing when
+it fires on your data, so every experimental flag now prints its measured rate
+beside it. Full table in `benchmarks/false_positives/README.md`.
+
+These rates are not proof the checks are wrong — ordinary data does contain
+derived columns and repeated blocks. They are proof that a flag from them is
+not, on its own, a reason to suspect anything.
+
 ## What a `clear` does not mean
 
 These checks test whether reported numbers are **arithmetically consistent

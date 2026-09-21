@@ -6,7 +6,9 @@ could not run and why, and leaves the weighing of those facts to the reader.
 
 from __future__ import annotations
 
+import csv
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -26,17 +28,42 @@ from scifraudscan.detectors.structure import run_structure_checks
 from scifraudscan.detectors.timeseries import run_timeseries_checks
 from scifraudscan.models import Finding
 
-CHECK_GROUPS: tuple[str, ...] = (
+# Checks whose verdicts have been reproduced against real published papers,
+# cell by cell, against conclusions reached outside this toolkit. These are
+# exact arithmetic: a failure means the reported numbers cannot all be true.
+VALIDATED_GROUPS: tuple[str, ...] = (
+    "reported_stats",
+    "baseline_p",
+)
+
+# Everything else. These are not wrong, but nothing establishes how often they
+# fire on sound data, so they are off unless asked for. See
+# references/METHODOLOGY.md and benchmarks/real_cases/README.md.
+EXPERIMENTAL_GROUPS: tuple[str, ...] = (
     "authenticity",
     "duplication",
     "structure",
     "randomization",
     "covariance",
     "timeseries",
-    "reported_stats",
     "pvalues",
-    "baseline",
+    "baseline_balance",
 )
+
+CHECK_GROUPS: tuple[str, ...] = VALIDATED_GROUPS + EXPERIMENTAL_GROUPS
+
+BASE_RATE_FILE = Path(__file__).resolve().parent / "reference" / "experimental_base_rates.csv"
+
+
+def experimental_base_rates() -> dict[str, float]:
+    """How often each experimental check fires on ordinary real datasets.
+
+    Measured over 300 datasets from Rdatasets that have nothing to do with
+    research misconduct. A severity means little without this number: a check
+    that fires on 87% of ordinary data is describing the data, not an anomaly.
+    """
+    with BASE_RATE_FILE.open() as fh:
+        return {row["check"]: float(row["base_rate"]) for row in csv.DictReader(fh)}
 
 DATA_GROUPS = frozenset({"authenticity", "duplication", "structure", "randomization",
                          "covariance", "timeseries"})
@@ -52,8 +79,14 @@ def scan(
     group_column: str | None = None,
     time_column: str | None = None,
     assumed_power: float = 0.5,
+    include_experimental: bool = False,
 ) -> dict[str, Any]:
-    selected = tuple(groups) if groups else CHECK_GROUPS
+    if groups:
+        selected = tuple(groups)  # naming a group explicitly is opting into it
+    elif include_experimental:
+        selected = CHECK_GROUPS
+    else:
+        selected = VALIDATED_GROUPS
     unknown = [g for g in selected if g not in CHECK_GROUPS]
     if unknown:
         raise ValueError(f"Unknown check groups: {', '.join(unknown)}")
@@ -67,12 +100,11 @@ def scan(
         "timeseries": lambda: run_timeseries_checks(df, time_column),
         "reported_stats": lambda: validate_reported_stats(reported_stats),
         "pvalues": lambda: run_p_value_checks(p_values, assumed_power),
-        "baseline": lambda: [
-            baseline_summary_check(baseline_summary),
-            reported_baseline_p_check(baseline_summary),
-        ],
+        "baseline_p": lambda: [reported_baseline_p_check(baseline_summary)],
+        "baseline_balance": lambda: [baseline_summary_check(baseline_summary)],
     }
 
+    base_rates = experimental_base_rates()
     sections: list[dict[str, Any]] = []
     for name in selected:
         if name in DATA_GROUPS and df is None:
@@ -81,10 +113,25 @@ def scan(
             continue
         if name == "pvalues" and p_values is None:
             continue
-        if name == "baseline" and baseline_summary is None:
+        if name in {"baseline_p", "baseline_balance"} and baseline_summary is None:
             continue
         findings = runners[name]()
-        sections.append({"group": name, "findings": [f.as_dict() for f in findings]})
+        serialized = []
+        for finding in (f.as_dict() for f in findings):
+            if name in EXPERIMENTAL_GROUPS and finding["check"] in base_rates:
+                finding["fires_on_ordinary_data"] = base_rates[finding["check"]]
+            serialized.append(finding)
+        sections.append(
+            {
+                "group": name,
+                "validation": (
+                    "reproduced against real published cases"
+                    if name in VALIDATED_GROUPS
+                    else "none — see references/METHODOLOGY.md"
+                ),
+                "findings": serialized,
+            }
+        )
 
     findings = [f for section in sections for f in section["findings"]]
     flagged = [f for f in findings if f["outcome"] == "flag"]
@@ -102,6 +149,7 @@ def scan(
         },
         "summary": {
             "groups_run": list(selected),
+            "experimental_groups_run": [g for g in selected if g in EXPERIMENTAL_GROUPS],
             "flagged": len(flagged),
             "cleared": sum(1 for f in findings if f["outcome"] == "clear"),
             "not_applicable": sum(1 for f in findings if f["outcome"] == "not_applicable"),

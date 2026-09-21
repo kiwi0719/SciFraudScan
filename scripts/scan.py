@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pandas as pd
 from scifraudscan._version import __version__
-from scifraudscan.pipeline import CHECK_GROUPS, scan
+from scifraudscan.pipeline import EXPERIMENTAL_GROUPS, VALIDATED_GROUPS, scan
 from scifraudscan.report import render_text
 
 
@@ -26,7 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
         prog="scan.py",
         description="Screen research data and reported statistics for anomaly signals.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Check groups: " + ", ".join(CHECK_GROUPS),
+        epilog=(
+            "Validated check groups (run by default): "
+            + ", ".join(VALIDATED_GROUPS)
+            + "\nExperimental, no real-case validation (need --experimental or --checks): "
+            + ", ".join(EXPERIMENTAL_GROUPS)
+        ),
     )
     parser.add_argument(
         "--version", action="version", version=f"scifraudscan {__version__}"
@@ -45,7 +50,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--time-column", help="Time or sequence column, enables the ordered checks."
     )
-    parser.add_argument("--checks", help="Comma-separated subset of check groups to run.")
+    parser.add_argument(
+        "--experimental",
+        action="store_true",
+        help="Also run the checks that have no real-case validation (see METHODOLOGY).",
+    )
+    parser.add_argument(
+        "--checks",
+        help="Comma-separated check groups. Naming a group runs it whatever its status.",
+    )
     parser.add_argument(
         "--assumed-power",
         type=float,
@@ -75,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
             group_column=args.group_column,
             time_column=args.time_column,
             assumed_power=args.assumed_power,
+            include_experimental=args.experimental,
         )
     except (ValueError, FileNotFoundError) as error:
         print(f"error: {error}", file=sys.stderr)

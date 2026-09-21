@@ -38,6 +38,7 @@ def clean_result(examples_dir) -> dict:
         pd.read_csv(examples_dir / "clean_trial.csv"),
         group_column="arm",
         time_column="enrol_day",
+        include_experimental=True,
     )
 
 
@@ -49,6 +50,7 @@ def fabricated_result(examples_dir) -> dict:
         time_column="enrol_day",
         reported_stats=pd.read_csv(examples_dir / "reported_stats.csv"),
         p_values=pd.read_csv(examples_dir / "p_values.csv"),
+        include_experimental=True,
     )
 
 
@@ -68,6 +70,26 @@ def test_every_check_reports_an_outcome(fabricated_result) -> None:
     assert len(findings) == 22
     assert all(f["outcome"] in {"flag", "clear", "not_applicable"} for f in findings)
     assert all(f["message"] for f in findings)
+
+
+def test_the_default_run_is_the_validated_checks_only(examples_dir) -> None:
+    """A raw dataset reaches no validated check, and must not silently appear clean."""
+    result = scan(pd.read_csv(examples_dir / "fabricated_trial.csv"), group_column="arm")
+    assert result["sections"] == []
+    assert result["summary"]["groups_run"] == ["reported_stats", "baseline_p"]
+    assert result["summary"]["experimental_groups_run"] == []
+
+    opted_in = scan(
+        pd.read_csv(examples_dir / "fabricated_trial.csv"),
+        group_column="arm",
+        include_experimental=True,
+    )
+    assert opted_in["summary"]["experimental_groups_run"]
+    assert all(
+        s["validation"].startswith("none")
+        for s in opted_in["sections"]
+        if s["group"] not in {"reported_stats", "baseline_p"}
+    )
 
 
 def test_no_aggregate_score_is_produced(clean_result) -> None:

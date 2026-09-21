@@ -93,8 +93,20 @@ python scripts/scan.py --p-values pvals.csv --assumed-power 0.8
 Use `--format json` when you are going to interpret the output; the text
 format is for a human reading it directly.
 
-Check groups: `authenticity`, `duplication`, `structure`, `randomization`,
-`covariance`, `timeseries`, `reported_stats`, `pvalues`.
+**Only the validated checks run by default**: `reported_stats` and
+`baseline_p`. They have a measured false-positive rate of 0 in 7,307
+statistics computed from real data, and GRIM agrees with the R reference
+implementation on 6000/6000 cases.
+
+Everything else — `authenticity`, `duplication`, `structure`, `randomization`,
+`covariance`, `timeseries`, `pvalues`, `baseline_balance` — needs
+`--experimental` or an explicit `--checks`. On 300 ordinary real datasets,
+89% drew at least one experimental flag; terminal-digit preference fires on
+87% of them, Benford on 74%. Each experimental flag prints its own rate.
+
+**Do not pass `--experimental` by reflex.** If you do, treat a flag from a
+check with a high base rate as a description of ordinary data unless something
+else corroborates it, and always quote the rate alongside the finding.
 
 ### 5. Read the output
 

@@ -29,15 +29,26 @@ def grim_consistent(n: int, mean: float, decimals: int, scale_step: float = 1.0)
 
     Brown & Heathers (2017). With scale_step s, admissible totals are multiples
     of s, so the granularity of the total is n*s rather than 1.
+
+    A mean printed to d decimals stands for anything in +/- half a unit of the
+    last place, so a candidate total is consistent when its quotient falls in
+    that interval. Comparing rounded values instead would bake in one rounding
+    convention: at n = 80, a total of 274 gives 3.425, which is 3.42 under
+    round-half-to-even and 3.43 under round-half-away-from-zero. Values sitting
+    exactly on that boundary are treated as consistent, as Brown & Heathers and
+    van der Zee et al. recommend -- a screening tool must not call a number
+    impossible because of a tie-breaking rule the paper never stated.
     """
     if n <= 0 or scale_step <= 0:
         return False
+    if not grim_evaluable(mean, decimals):
+        return True  # cannot be ruled out; callers should report it as unevaluable
     granularity = scale_step / n
+    half_unit = 0.5 * 10**-decimals
+    tolerance = half_unit * 1e-9
     quotient = mean / granularity
-    tolerance = 10 ** -(decimals + 6)
     for candidate in {math.floor(quotient), round(quotient), math.ceil(quotient)}:
-        reconstructed = candidate * granularity
-        if abs(round(reconstructed, decimals) - mean) <= tolerance:
+        if abs(candidate * granularity - mean) <= half_unit + tolerance:
             return True
     return False
 
@@ -73,6 +84,10 @@ def grimmer_consistent(
     """
     if n <= 1:
         return False
+    # GRIMMER works with the sum of squares, which grows as n * mean^2, so it
+    # runs out of exact integer range sooner than GRIM does.
+    if not grim_evaluable(mean, mean_decimals) or n * mean**2 > 2**53:
+        return True  # cannot be ruled out at this magnitude
     mean_half = 0.5 * 10**-mean_decimals
     sd_half = 0.5 * 10**-sd_decimals
     sd_low = max(0.0, sd - sd_half)
@@ -150,6 +165,21 @@ def mann_whitney_p_upper_bound(u: float, n1: int, n2: int) -> float | None:
     return min(1.0, max(candidates))
 
 
+# A double carries about 16 significant digits. GRIM asks whether a value sits
+# within half a unit of the last decimal place, so once the magnitude is large
+# enough that float error approaches that half-unit the answer is noise. Measured
+# on real data, this was the only source of GRIM and GRIMMER false positives:
+# GDP figures around 1e13 reported to two decimals, and an ISBN treated as a
+# measurement. Beyond the limit the test reports that it cannot evaluate the row
+# rather than guessing.
+GRIM_PRECISION_LIMIT = 5e13
+
+
+def grim_evaluable(mean: float, decimals: int) -> bool:
+    """Is float precision fine enough to decide GRIM for a value this large?"""
+    return abs(mean) < GRIM_PRECISION_LIMIT * 10**-decimals
+
+
 MANN_WHITNEY_NAMES = frozenset({"u", "mwu", "mannwhitney", "mann-whitney", "mann_whitney"})
 
 
@@ -175,6 +205,7 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
     sd_checked = 0
     mismatches: list[dict[str, object]] = []
     p_checked = 0
+    unevaluable: list[dict[str, object]] = []
 
     for index, row in stats_df.iterrows():
         test = str(row.get("test", "")).strip().lower()
@@ -188,6 +219,13 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
         if test in {"grim", "grimmer", "sprite"} and n and mean is not None:
             grim_checked += 1
             mean_decimals = decimal_places(row.get("mean"))
+            if not grim_evaluable(mean, mean_decimals) or n * mean**2 > 2**53:
+                grim_checked -= 1
+                unevaluable.append(
+                    {"row": int(index), "n": n, "reported_mean": mean,
+                     "reason": "value too large to decide at this precision"}
+                )
+                continue
             mean_attainable = grim_consistent(n, mean, mean_decimals, scale_step)
             if not mean_attainable:
                 grim_failures.append(
@@ -253,7 +291,7 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
             )
 
     return [
-        _grim_finding(grim_failures, grim_checked),
+        _grim_finding(grim_failures, grim_checked, unevaluable),
         _sd_finding(sd_failures, sd_checked),
         _statcheck_finding(mismatches, p_checked),
     ]
@@ -291,24 +329,35 @@ def _sd_failure(
     return None
 
 
-def _grim_finding(failures: list[dict[str, object]], checked: int) -> Finding:
+def _grim_finding(
+    failures: list[dict[str, object]], checked: int, unevaluable: list[dict[str, object]]
+) -> Finding:
     check = "GRIM"
+    extra: dict[str, object] = {"n_checked": checked}
+    if unevaluable:
+        extra["unevaluable_rows"] = unevaluable[:20]
+        extra["unevaluable_count"] = len(unevaluable)
     if checked == 0:
-        return not_applicable(check, "No row supplied both an integer N and a reported mean.")
+        reason = (
+            f"All {len(unevaluable)} candidate rows hold values too large to decide at "
+            "double precision."
+            if unevaluable
+            else "No row supplied both an integer N and a reported mean."
+        )
+        return not_applicable(check, reason, **extra)
+    suffix = f" {len(unevaluable)} further rows were too large to decide." if unevaluable else ""
     if not failures:
         return clear(
-            check,
-            f"All {checked} reported means are attainable for their N.",
-            n_checked=checked,
+            check, f"All {checked} reported means are attainable for their N.{suffix}", **extra
         )
     return flag(
         check,
         "high",
         f"{len(failures)} of {checked} reported means cannot arise from N responses "
-        "on the stated scale.",
+        f"on the stated scale.{suffix}",
         failures=failures[:50],
         failure_count=len(failures),
-        n_checked=checked,
+        **extra,
     )
 
 
