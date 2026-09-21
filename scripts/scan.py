@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pandas as pd
+from scifraudscan._version import __version__
 from scifraudscan.pipeline import CHECK_GROUPS, scan
 from scifraudscan.report import render_text
 
@@ -26,6 +27,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Screen research data and reported statistics for anomaly signals.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Check groups: " + ", ".join(CHECK_GROUPS),
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"scifraudscan {__version__}"
     )
     parser.add_argument("data", nargs="?", type=Path, help="Dataset CSV to scan.")
     parser.add_argument(

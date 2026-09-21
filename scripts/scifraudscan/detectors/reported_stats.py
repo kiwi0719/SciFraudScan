@@ -124,7 +124,8 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
         if test in {"grim", "grimmer", "sprite"} and n and mean is not None:
             grim_checked += 1
             mean_decimals = decimal_places(row.get("mean"))
-            if not grim_consistent(n, mean, mean_decimals, scale_step):
+            mean_attainable = grim_consistent(n, mean, mean_decimals, scale_step)
+            if not mean_attainable:
                 grim_failures.append(
                     {
                         "row": int(index),
@@ -138,7 +139,12 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
 
             # GRIMMER needs only N, mean and SD; the variance-bounds test additionally
             # needs the scale, so the two run independently of each other.
-            if sd is not None:
+            #
+            # An SD is only testable when the mean is attainable. If no integer
+            # total produces the reported mean, GRIMMER fails for that reason
+            # alone and says nothing about the SD, so counting it as an SD
+            # failure would report the same defect twice.
+            if sd is not None and mean_attainable:
                 sd_checked += 1
                 failure = _sd_failure(n, mean, sd, scale_min, scale_max, mean_decimals, row)
                 if failure:
@@ -236,16 +242,25 @@ def _grim_finding(failures: list[dict[str, object]], checked: int) -> Finding:
 def _sd_finding(failures: list[dict[str, object]], checked: int) -> Finding:
     check = "SD Feasibility (GRIMMER / variance bounds)"
     if checked == 0:
-        return not_applicable(check, "No row supplied N, mean and SD together.")
+        return not_applicable(
+            check,
+            "No row supplied N, mean and SD together with an attainable mean. An SD can "
+            "only be tested once the mean it belongs to is possible.",
+        )
     if not failures:
-        return clear(check, f"All {checked} mean/SD pairs are attainable.", n_checked=checked)
+        return clear(
+            check,
+            f"All {checked} testable mean/SD pairs are attainable.",
+            n_testable=checked,
+        )
     return flag(
         check,
         "high",
-        f"{len(failures)} of {checked} mean/SD pairs are impossible on the stated scale.",
+        f"{len(failures)} of {checked} testable mean/SD pairs are impossible; "
+        "an SD is testable only where the mean itself is attainable.",
         failures=failures[:50],
         failure_count=len(failures),
-        n_checked=checked,
+        n_testable=checked,
     )
 
 

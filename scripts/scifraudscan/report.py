@@ -26,7 +26,8 @@ DISCLAIMER = (
 def render_text(result: dict[str, Any], show_details: bool = True) -> str:
     summary = result["summary"]
     inputs = result["inputs"]
-    lines = ["SciFraudScan", "=" * 60, ""]
+    version = result.get("scifraudscan_version", "")
+    lines = [f"SciFraudScan {version}".rstrip(), "=" * 60, ""]
 
     lines.append(
         f"Input: {inputs['rows']} rows, {len(inputs['columns'])} columns"

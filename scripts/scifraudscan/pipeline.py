@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+from scifraudscan._version import __version__
 from scifraudscan.detectors.authenticity import index_like_columns, run_authenticity_checks
 from scifraudscan.detectors.covariance import run_covariance_checks
 from scifraudscan.detectors.duplication import run_duplication_checks
@@ -89,6 +90,7 @@ def scan(
     flagged = [f for f in findings if f["outcome"] == "flag"]
     severities = [f.get("severity") for f in flagged]
     return {
+        "scifraudscan_version": __version__,
         "inputs": {
             "rows": len(df) if df is not None else 0,
             "columns": [str(c) for c in df.columns] if df is not None else [],
