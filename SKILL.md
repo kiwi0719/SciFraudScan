@@ -56,13 +56,20 @@ not silently invalidates the Carlisle check.
 This is the part only you can do. Build a CSV with these columns:
 
 ```csv
-test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,p
-grim,20,3.46,,1,5,1,,,,
-grimmer,30,4.50,2.80,1,5,1,,,,
-t,,,,,,,2.35,18,,0.004
-f,,,,,,,4.20,2,57,0.020
-chi2,,,,,,,7.82,3,,0.050
+test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,n1,n2,p
+grim,20,3.46,,1,5,1,,,,,,
+grimmer,30,4.50,2.80,1,5,1,,,,,,
+t,,,,,,,2.35,18,,,,0.004
+f,,,,,,,4.20,2,57,,,0.020
+chi2,,,,,,,7.82,3,,,,0.050
+u,,,,,,,2291.0,,,54,54,0.0000294
 ```
+
+`test=u` is a Mann-Whitney U test and takes the two group sizes in `n1`/`n2`
+instead of degrees of freedom. It does not matter whether the paper reports
+U1, U2 or the smaller of the two — the test is symmetric. The check is
+one-sided: ties shrink p and cannot be recovered from a published U, so only
+a reported p *above* the largest reachable value is reported as inconsistent.
 
 Rules that change the answer:
 
@@ -109,6 +116,11 @@ When writing up:
   predict on honest data.
 - **Never restate a severity as a probability.** "high" means "no ordinary
   explanation", not "likely fraud".
+- **Never report a clear result as reassurance.** These checks test whether
+  numbers are consistent with each other. Fabricated data processed by
+  software is internally consistent and clears all of them. "No reporting
+  errors of this kind were found" is the strongest statement a clear result
+  supports; "the data look sound" is not.
 
 Load `references/METHODOLOGY.md` before interpreting anything: it gives each
 check's assumptions, minimum data, thresholds and failure modes.

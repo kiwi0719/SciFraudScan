@@ -3,6 +3,25 @@
 What each check tests, what it needs to run, what makes it fire, and how it
 fails. Read the "fails when" column before repeating any result to anyone.
 
+## What a `clear` does not mean
+
+These checks test whether reported numbers are **arithmetically consistent
+with each other**. They detect carelessness, not competence. Summary
+statistics computed by software from fabricated raw data are internally
+consistent and clear every check here.
+
+So a `clear` means "no reporting error of this kind was found" and nothing
+more. It is not evidence that the work is sound, and reporting it as
+reassurance is a misuse of this toolkit. The asymmetry is deliberate: a GRIM
+failure can show a number is impossible, but no result here can show a number
+is trustworthy.
+
+The same asymmetry governs the benchmarks. Establishing that a check fires on
+a known defect is easy; establishing that it stays quiet on honest data
+requires knowing the data are honest, which almost always means an
+independent verdict from outside this toolkit. `benchmarks/real_cases/`
+records for each case whether such a verdict exists.
+
 ## The three outcomes
 
 Every check returns exactly one of:
@@ -299,6 +318,11 @@ On one study's handful of p-values they have no power, and each returns
 
 ## Known gaps
 
+- **One case has no independent ground truth.** The anonymous Mann-Whitney
+  case is real published input, but nothing establishes the integrity of its
+  source, so it cannot serve as a false-positive control — "these rows
+  passed" would be evidence only if passing were already known to be right.
+  It pins behaviour, not accuracy.
 - **Real-case validation covers GRIM and GRIMMER only, on two papers.**
   `benchmarks/real_cases/` reproduces the per-cell verdicts of a published
   reanalysis of one retracted and one corrected paper (58 cells, full

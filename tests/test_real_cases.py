@@ -17,7 +17,12 @@ from scifraudscan.detectors.randomization import (
     baseline_summary_check,
     reported_baseline_p_check,
 )
-from scifraudscan.detectors.reported_stats import grim_consistent, grimmer_consistent
+from scifraudscan.detectors.reported_stats import (
+    grim_consistent,
+    grimmer_consistent,
+    mann_whitney_p_upper_bound,
+    validate_reported_stats,
+)
 from scifraudscan.utils import decimal_places
 from scipy import stats
 
@@ -196,3 +201,56 @@ def test_honest_summary_table_is_not_flagged() -> None:
     table = pd.DataFrame(rows)
     assert reported_baseline_p_check(table).outcome == "clear"
     assert baseline_summary_check(table).outcome == "clear"
+
+
+# --- anonymous case: real reported Mann-Whitney comparisons --------------------
+
+
+@pytest.fixture(scope="module")
+def anonymous_utests(real_cases_dir) -> pd.DataFrame:
+    return pd.read_csv(real_cases_dir / "anonymous_utests" / "reported_stats.csv", dtype=str)
+
+
+def test_real_reported_u_tests_mostly_pass(anonymous_utests: pd.DataFrame) -> None:
+    """29 of 30 real reported p-values are consistent with their own U statistic.
+
+    This is NOT a false-positive control: the integrity of the source paper has
+    not been independently established, so "these passed" cannot be evidence
+    that passing is correct. It pins behaviour on real input. See SOURCE.md.
+    """
+    finding = next(
+        f
+        for f in validate_reported_stats(anonymous_utests)
+        if f.check.startswith("Reported p")
+    )
+    assert finding.details["n_checked"] == 30
+    assert finding.details["mismatch_count"] == 1, (
+        "expected exactly one inconsistency; see the case's SOURCE.md before "
+        "accepting any change to this number"
+    )
+    assert finding.details["decision_error_count"] == 0
+
+
+def test_a_reported_p_below_the_bound_is_never_flagged(
+    anonymous_utests: pd.DataFrame,
+) -> None:
+    """Ties only move p downward, so a p under the bound cannot be called impossible.
+
+    Correct by construction, independently of whether the source paper is sound.
+    """
+    below = 0
+    for _, row in anonymous_utests.iterrows():
+        bound = mann_whitney_p_upper_bound(float(row["stat"]), int(row["n1"]), int(row["n2"]))
+        if float(row["p"]) < bound / 10:
+            below += 1
+    assert below >= 4, "expected several rows well under the bound in this case"
+    finding = next(
+        f
+        for f in validate_reported_stats(anonymous_utests)
+        if f.check.startswith("Reported p")
+    )
+    flagged = {m["reported_p"] for m in finding.details["mismatches"]}
+    for _, row in anonymous_utests.iterrows():
+        bound = mann_whitney_p_upper_bound(float(row["stat"]), int(row["n1"]), int(row["n2"]))
+        if float(row["p"]) < bound:
+            assert float(row["p"]) not in flagged

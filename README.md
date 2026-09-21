@@ -117,6 +117,7 @@ literature, cell by cell, against the verdicts that reanalysis reached:
 | Sigirci & Wansink (2015), *BMC Nutrition* | **Retracted** 2017 | GRIM / GRIMMER, 30 means + 20 SDs | 30/30, 20/20 match published verdicts |
 | Just, Sigirci & Wansink (2014), *J Sensory Studies* | Corrected 2017 | GRIM / GRIMMER, 28 cells | 28/28 match published verdicts |
 | Sato / Iwamoto trials | **Retracted** (20+ papers) | Baseline tables, 50 variables | 5 of 10 printed p-values unreachable; balance test **does not fire** |
+| Anonymous, not identified | **Unknown** | 30 Mann-Whitney comparisons | 29 of 30 internally consistent — *not* a false-positive control, see below |
 
 The Wansink verdicts come from [van der Zee, Anaya & Brown (2017)](https://doi.org/10.1186/s40795-017-0167-x),
 cross-checked against the reanalysis authors'
@@ -143,6 +144,15 @@ were flagged **100% of the time**. Published tables are now compared against
 that empirical distribution instead, which holds the false positive rate near
 1% while still detecting a genuinely too-balanced collection 99% of the time.
 See [`scripts/scifraudscan/reference/README.md`](scripts/scifraudscan/reference/README.md).
+
+The anonymous case carries no independent verdict, so it cannot show the
+checks are accurate — "these rows passed" would be evidence only if passing
+were already known to be right. It pins behaviour on real input, and nothing
+more.
+
+**A clear result is not reassurance.** These checks test whether reported
+numbers are arithmetically consistent with each other. Fabricated data
+processed by software is internally consistent and clears all of them.
 
 Still narrow: the arithmetic checks are validated on three real cases from two
 research groups. Duplication, digit preference and the sequential checks have

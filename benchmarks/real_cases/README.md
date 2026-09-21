@@ -36,3 +36,7 @@ reanalysis found *consistent* are the false-positive controls.
 - **Negative results stay.** Where a check fails to detect something a
   published analysis did detect, the case records that and explains why. No
   threshold in this toolkit has been moved to improve a number on this page.
+- **A case is only a false-positive control if its integrity was established
+  somewhere else.** "These rows passed our checks" cannot be evidence that
+  passing them was right. Each `SOURCE.md` says whether an independent verdict
+  exists; `anonymous_utests/` says plainly that it does not.

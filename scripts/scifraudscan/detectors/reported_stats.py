@@ -13,6 +13,7 @@ returns a different answer on a re-run.
 
 from __future__ import annotations
 
+import functools
 import math
 
 import numpy as np
@@ -89,6 +90,69 @@ def grimmer_consistent(
     return False
 
 
+@functools.lru_cache(maxsize=256)
+def _mann_whitney_null(n1: int, n2: int) -> np.ndarray:
+    """Exact distribution of U under the null, assuming no ties.
+
+    Counts arrangements by the standard recurrence
+    f(m, n, u) = f(m-1, n, u-n) + f(m, n-1, u), then normalises.
+    """
+    counts = np.zeros((n1 + 1, n2 + 1, n1 * n2 + 1))
+    counts[0, :, 0] = 1.0
+    counts[:, 0, 0] = 1.0
+    for m in range(1, n1 + 1):
+        for n in range(1, n2 + 1):
+            shifted = np.zeros(n1 * n2 + 1)
+            if n <= m * n:
+                shifted[n:] = counts[m - 1, n, : n1 * n2 + 1 - n]
+            counts[m, n] = shifted + counts[m, n - 1]
+    total = counts[n1, n2].sum()
+    return counts[n1, n2] / total
+
+
+def mann_whitney_p_upper_bound(u: float, n1: int, n2: int) -> float | None:
+    """Largest two-sided p the reported U can correspond to.
+
+    Ties shrink the variance of U and can only move p downward, and they
+    cannot be recovered from a paper that reports only U. The no-tie p is
+    therefore an upper bound, which makes the consistency check one-sided: a
+    reported p *below* this is ordinary, a reported p *above* it is not
+    reachable however the data were tied.
+
+    The bound is the largest value produced by the exact null distribution and
+    by the normal approximation with and without a continuity correction,
+    since a paper rarely says which of them it used.
+
+    The test is symmetric about n1*n2/2, so it does not matter whether the
+    paper reports U1, U2 or the smaller of the two.
+    """
+    if n1 < 1 or n2 < 1:
+        return None
+    maximum = n1 * n2
+    if not 0 <= u <= maximum:
+        return None
+    centre = maximum / 2
+    distance = abs(u - centre)
+    sd = math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12)
+
+    # Papers do not say which form of the test produced their p, and the three
+    # in common use disagree by a few thousandths at these sample sizes. Take
+    # the largest, so the bound is never tighter than the method the authors
+    # actually used.
+    candidates = [
+        float(2 * stats.norm.sf(distance / sd)),
+        float(2 * stats.norm.sf(max(0.0, distance - 0.5) / sd)),
+    ]
+    if n1 * n2 <= 4000:  # exact is cheap at these sizes and correct for small n
+        null = _mann_whitney_null(n1, n2)
+        support = np.arange(maximum + 1)
+        candidates.append(float(null[np.abs(support - centre) >= distance - 1e-9].sum()))
+    return min(1.0, max(candidates))
+
+
+MANN_WHITNEY_NAMES = frozenset({"u", "mwu", "mannwhitney", "mann-whitney", "mann_whitney"})
+
+
 def p_from_statistic(test: str, statistic: float, df1: float, df2: float | None) -> float | None:
     if test == "t":
         return float(stats.t.sf(abs(statistic), df1) * 2)
@@ -154,6 +218,15 @@ def validate_reported_stats(stats_df: pd.DataFrame) -> list[Finding]:
         reported_p = safe_float(row.get("p"))
         df1 = safe_float(row.get("df1"))
         df2 = safe_float(row.get("df2"))
+
+        if test in MANN_WHITNEY_NAMES:
+            outcome = _mann_whitney_mismatch(row, statistic, reported_p, int(index))
+            if outcome is not None:
+                p_checked += 1
+                if outcome:
+                    mismatches.append(outcome)
+            continue
+
         if statistic is None or reported_p is None or df1 is None:
             continue
         computed = p_from_statistic(test, statistic, df1, df2)
@@ -268,7 +341,9 @@ def _statcheck_finding(mismatches: list[dict[str, object]], checked: int) -> Fin
     check = "Reported p-value Consistency"
     if checked == 0:
         return not_applicable(
-            check, "No row supplied a test statistic, its df and a reported p-value."
+            check,
+            "No row supplied a test statistic with its df (or, for Mann-Whitney U, its "
+            "group sizes) and a reported p-value.",
         )
     if not mismatches:
         return clear(
@@ -281,13 +356,48 @@ def _statcheck_finding(mismatches: list[dict[str, object]], checked: int) -> Fin
     return flag(
         check,
         severity,
-        f"{len(mismatches)} of {checked} reported p-values disagree with the value recomputed "
-        f"from the statistic and df; {len(decision_errors)} change significance at alpha=.05.",
+        f"{len(mismatches)} of {checked} reported p-values are not consistent with the test "
+        f"statistic reported beside them; {len(decision_errors)} change significance "
+        "at alpha=.05.",
         mismatches=mismatches[:50],
         mismatch_count=len(mismatches),
         decision_error_count=len(decision_errors),
         n_checked=checked,
     )
+
+
+def _mann_whitney_mismatch(
+    row: pd.Series, statistic: float | None, reported_p: float | None, index: int
+) -> dict[str, object] | bool | None:
+    """None if the row cannot be checked, False if it is fine, else the mismatch.
+
+    One-sided by necessity. Ties shrink p and cannot be recovered from a
+    published U, so only a reported p *above* the no-tie value is a problem.
+    """
+    n1 = _as_int(row.get("n1"))
+    n2 = _as_int(row.get("n2"))
+    if statistic is None or reported_p is None or n1 is None or n2 is None:
+        return None
+    upper_bound = mann_whitney_p_upper_bound(statistic, n1, n2)
+    if upper_bound is None:
+        return None
+    tolerance = 0.5 * 10 ** -max(decimal_places(row.get("p")), 2)
+    if reported_p <= upper_bound + tolerance:
+        return False
+    return {
+        "row": index,
+        "test": "mann-whitney u",
+        "statistic": statistic,
+        "n1": n1,
+        "n2": n2,
+        "reported_p": reported_p,
+        "max_possible_p": float(f"{upper_bound:.6g}"),
+        "crosses_alpha": bool((reported_p < 0.05) != (upper_bound < 0.05)),
+        "reason": (
+            "reported p exceeds the largest value this U can produce; ties only "
+            "move p downward, so they cannot explain it"
+        ),
+    }
 
 
 def _as_int(value: object) -> int | None:
