@@ -1,6 +1,9 @@
-test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,p
-grim,20,3.43,,1,5,1,,,,
-sprite,12,3.41,0.10,1,5,1,,,,
-t,,,,,,,2.35,18,,0.030
-f,,,,,,,4.20,2,57,0.020
-chi2,,,,,,,7.82,3,,0.050
+test,n,mean,sd,scale_min,scale_max,scale_step,stat,df1,df2,p,note
+grim,20,3.46,,1,5,1,,,,,impossible mean
+grim,20,3.40,,1,5,1,,,,,attainable mean
+grimmer,30,4.50,2.80,1,5,1,,,,,impossible SD
+grimmer,30,3.00,1.20,1,5,1,,,,,attainable mean and SD
+t,,,,,,,2.35,18,,0.004,"p inconsistent, decision error"
+t,,,,,,,2.35,18,,0.030,p consistent
+f,,,,,,,4.2,2,57,0.020,p consistent
+chi2,,,,,,,7.82,3,,0.050,p consistent
