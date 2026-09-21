@@ -32,6 +32,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--reported-stats", type=Path, help="CSV of statistics as reported in the paper."
     )
     parser.add_argument("--p-values", type=Path, help="CSV of p-values, one per row.")
+    parser.add_argument(
+        "--baseline-summary",
+        type=Path,
+        help="CSV of a published baseline table: study, var, n1..n4, m1..m4, s1..s4, p.",
+    )
     parser.add_argument("--group-column", help="Treatment/arm column, enables the Carlisle check.")
     parser.add_argument(
         "--time-column", help="Time or sequence column, enables the ordered checks."
@@ -50,8 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if not any([args.data, args.reported_stats, args.p_values]):
-        build_parser().error("provide a dataset CSV, --reported-stats, or --p-values")
+    if not any([args.data, args.reported_stats, args.p_values, args.baseline_summary]):
+        build_parser().error(
+            "provide a dataset CSV, --reported-stats, --p-values, or --baseline-summary"
+        )
 
     groups = [g.strip() for g in args.checks.split(",") if g.strip()] if args.checks else None
     try:
@@ -60,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             groups=groups,
             reported_stats=_read(args.reported_stats),
             p_values=_read(args.p_values),
+            baseline_summary=_read(args.baseline_summary),
             group_column=args.group_column,
             time_column=args.time_column,
             assumed_power=args.assumed_power,

@@ -36,6 +36,7 @@ will get them wrong.
 | Raw data (CSV/XLSX, supplementary file) | data checks — pass `--group-column` / `--time-column` when they exist |
 | A paper's Table 1 / results text only | `--reported-stats` (GRIM, GRIMMER, p recomputation) |
 | Many p-values from one literature or author | `--p-values` |
+| A trial's baseline table (Table 1), per-arm n / mean / SD | `--baseline-summary` |
 
 Reported-statistics checks are the highest-value ones and need no raw data at
 all. A GRIM failure is arithmetic; nothing else here is that solid.
@@ -118,9 +119,14 @@ No image forensics, no text or reference checking, no full SPRITE search, no
 statcheck prose parsing. The p-value checks need a body of results, not one
 study.
 
-Real-case validation covers GRIM and GRIMMER on two papers from one lab. The
-data-side checks have none. There is no known real-world false positive rate,
-so do not quote one.
+Real-case validation covers the arithmetic checks on three cases from two
+research groups. The data-side checks (duplication, digits, sequential) have
+none. There is no known real-world false positive rate, so do not quote one.
+
+The Carlisle uniformity test is badly underpowered below a few hundred
+baseline variables — on 50 variables from known-fabricated trials it returns
+`clear`. Do not read a `clear` from it as reassurance; say it was
+underpowered.
 
 ## Reproducing the benchmarks
 

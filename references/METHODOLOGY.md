@@ -167,6 +167,10 @@ steps by construction.
 - **Tests:** under real randomization, baseline comparisons between arms give
   p-values uniform on [0, 1]. Fabricated data tends to be *too* balanced,
   pushing them toward 1.
+- **Two entry points:** `carlisle_method` works from raw participant rows;
+  `baseline_summary_check` works from a published baseline table (per-arm n,
+  mean and SD). The second is the case that actually arises when screening a
+  paper, and is how Carlisle and Bolland apply the method.
 - **Needs:** a group column and at least 5 usable baseline variables.
   High-cardinality categoricals (IDs) are excluded.
 - **Two tests are run:** a two-sided KS test against uniform, and a one-sided
@@ -176,9 +180,38 @@ steps by construction.
   variables. Real baseline tables are correlated -- height with weight, age
   with comorbidity -- which makes the test anti-conservative. A flag here is a
   reason to look, never a result to report on its own.
-- **Underpowered below ~10 variables.** With 8 variables the test missed a
-  deliberately fabricated dataset during development. A `clear` from a short
-  baseline table means very little.
+- **Rounding alone breaks uniformity.** Published summary statistics are
+  rounded, which distorts the p-value distribution away from exactly uniform
+  (Bolland et al. 2020). The reference implementation compares against an
+  empirically simulated distribution instead; this one does not, which makes
+  it cruder.
+- **Badly underpowered on small collections.** With 8 variables the test
+  missed a deliberately fabricated dataset during development. On 50 real
+  baseline variables from the retracted Sato/Iwamoto trials it returns
+  `clear`, with mean p = 0.567 against the 0.500 expected — the shift is in
+  the fabrication direction but nowhere near significance. Bolland et al.
+  needed roughly 500 variables. **A `clear` from this check is close to
+  uninformative unless the collection is large.**
+
+### Reported baseline p-value consistency
+
+- **Source:** the `pval_cont_check` logic in Bolland's `reappraised` package.
+- **Tests:** whether the p-value printed next to a baseline row is reachable
+  from the n, mean and SD printed in that same row. The reachable range is
+  the minimum and maximum over every combination of the means and SDs at the
+  edges of their rounding intervals, under both Student's and Welch's t-test,
+  and the reported p is compared using its own rounding interval.
+- **Needs:** a two-arm row with n, mean, SD and a printed p-value.
+- **Why it is worth more than the uniformity test:** it assumes nothing about
+  the distribution of p-values across variables, so it works on a single
+  table and cannot be blunted by correlated baseline variables. On the
+  Sato/Iwamoto case it flagged 5 of 10 printed p-values where the uniformity
+  test found nothing.
+- **Fails when:** the paper used a test other than a t-test (Mann-Whitney,
+  or a test adjusted for covariates or clustering), or the p came from a
+  different subgroup than the row's n implies. Being generous about rounding
+  and about which form of the t-test was used keeps ordinary choices from
+  being flagged, but a different test entirely will still show up.
 
 ## Covariance structure
 

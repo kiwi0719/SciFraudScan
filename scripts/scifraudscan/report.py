@@ -14,6 +14,7 @@ GROUP_TITLES = {
     "timeseries": "Sequential structure",
     "reported_stats": "Reported statistics",
     "pvalues": "P-value distribution",
+    "baseline": "Published baseline table",
 }
 DISCLAIMER = (
     "These are statistical screening signals, not findings of misconduct. Every flag has "
