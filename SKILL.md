@@ -19,8 +19,11 @@ public post from these results, decline and offer the factual summary instead.
 
 ## Setup
 
+All paths below are relative to this skill's directory (the one holding this
+file). Run commands from there, or prefix the paths with it.
+
 ```bash
-pip install -r requirements.txt   # numpy, pandas, scipy
+pip install -r requirements.txt   # numpy, pandas, scipy; openpyxl for .xlsx
 ```
 
 If installing is not possible, say so rather than computing any of these by
@@ -33,7 +36,7 @@ will get them wrong.
 
 | You have | Run |
 |---|---|
-| Raw data (CSV/XLSX, supplementary file) | data checks — pass `--group-column` / `--time-column` when they exist |
+| Raw data (CSV, TSV or XLSX supplementary file) | data checks — pass `--group-column` / `--time-column` when they exist |
 | A paper's Table 1 / results text only | `--reported-stats` (GRIM, GRIMMER, p recomputation) |
 | Many p-values from one literature or author | `--p-values` |
 | A trial's baseline table (Table 1), per-arm n / mean / SD | `--baseline-summary` |
@@ -92,6 +95,11 @@ python scripts/scan.py --p-values pvals.csv --assumed-power 0.8
 
 Use `--format json` when you are going to interpret the output; the text
 format is for a human reading it directly.
+
+`summary.groups_run` lists only what actually ran. A group whose input was
+not supplied is in `summary.groups_skipped` with the reason; say which were
+skipped rather than implying they passed. A group you named in `--checks`
+without its input comes back as `not_applicable`.
 
 **Only the validated checks run by default**: `reported_stats` and
 `baseline_p`. They have a measured false-positive rate of 0 in 7,307

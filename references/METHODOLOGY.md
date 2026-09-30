@@ -1,5 +1,7 @@
 # Methodology
 
+**English** | [简体中文](METHODOLOGY.zh-CN.md)
+
 What each check tests, what it needs to run, what makes it fire, and how it
 fails. Read the "fails when" column before repeating any result to anyone.
 

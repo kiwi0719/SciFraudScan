@@ -26,7 +26,7 @@ from scifraudscan.detectors.randomization import (
 from scifraudscan.detectors.reported_stats import validate_reported_stats
 from scifraudscan.detectors.structure import run_structure_checks
 from scifraudscan.detectors.timeseries import run_timeseries_checks
-from scifraudscan.models import Finding
+from scifraudscan.models import Finding, not_applicable
 
 # Checks whose verdicts have been reproduced against real published papers,
 # cell by cell, against conclusions reached outside this toolkit. These are
@@ -107,14 +107,11 @@ def scan(
 
     base_rates = experimental_base_rates()
     sections: list[dict[str, Any]] = []
+    skipped: dict[str, str] = {}
     for name in selected:
-        if name in DATA_GROUPS and df is None:
-            continue
-        if name == "reported_stats" and reported_stats is None:
-            continue
-        if name == "pvalues" and p_values is None:
-            continue
-        if name in {"baseline_p", "baseline_balance"} and baseline_summary is None:
+        missing = _missing_input(name, df, reported_stats, p_values, baseline_summary)
+        if missing:
+            skipped[name] = missing
             continue
         findings = runners[name]()
         serialized = []
@@ -125,18 +122,26 @@ def scan(
         sections.append(
             {
                 "group": name,
-                "validation": (
-                    "reproduced against real published cases"
-                    if name in VALIDATED_GROUPS
-                    else "none — see references/METHODOLOGY.md"
-                ),
+                "validation": _validation_label(name),
                 "findings": serialized,
             }
         )
 
+    # A group the caller named explicitly but could not run is reported as
+    # not_applicable rather than dropped: silence would read as a clean result.
+    if groups:
+        for name, reason in skipped.items():
+            sections.append(
+                {
+                    "group": name,
+                    "validation": _validation_label(name),
+                    "findings": [not_applicable(name, reason).as_dict()],
+                }
+            )
     findings = [f for section in sections for f in section["findings"]]
     flagged = [f for f in findings if f["outcome"] == "flag"]
     severities = [f.get("severity") for f in flagged]
+    ran = [s["group"] for s in sections if s["group"] not in skipped]
     return {
         "scifraudscan_version": __version__,
         "inputs": {
@@ -147,10 +152,14 @@ def scan(
             "index_like_columns_skipped": index_like_columns(df) if df is not None else [],
             "reported_stats_rows": len(reported_stats) if reported_stats is not None else 0,
             "p_value_count": len(p_values) if p_values is not None else 0,
+            "baseline_summary_rows": (
+                len(baseline_summary) if baseline_summary is not None else 0
+            ),
         },
         "summary": {
-            "groups_run": list(selected),
-            "experimental_groups_run": [g for g in selected if g in EXPERIMENTAL_GROUPS],
+            "groups_run": ran,
+            "experimental_groups_run": [g for g in ran if g in EXPERIMENTAL_GROUPS],
+            "groups_skipped": skipped,
             "flagged": len(flagged),
             "cleared": sum(1 for f in findings if f["outcome"] == "clear"),
             "not_applicable": sum(1 for f in findings if f["outcome"] == "not_applicable"),
@@ -163,3 +172,28 @@ def scan(
         },
         "sections": sections,
     }
+
+
+def _validation_label(name: str) -> str:
+    if name in VALIDATED_GROUPS:
+        return "reproduced against real published cases"
+    return "none — see references/METHODOLOGY.md"
+
+
+def _missing_input(
+    name: str,
+    df: pd.DataFrame | None,
+    reported_stats: pd.DataFrame | None,
+    p_values: pd.DataFrame | None,
+    baseline_summary: pd.DataFrame | None,
+) -> str | None:
+    """Why a group cannot run on these inputs, or None when it can."""
+    if name in DATA_GROUPS and df is None:
+        return "needs a raw dataset (positional DATA argument)"
+    if name == "reported_stats" and reported_stats is None:
+        return "needs --reported-stats"
+    if name == "pvalues" and p_values is None:
+        return "needs --p-values"
+    if name in {"baseline_p", "baseline_balance"} and baseline_summary is None:
+        return "needs --baseline-summary"
+    return None

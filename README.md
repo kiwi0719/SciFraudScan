@@ -1,65 +1,114 @@
 # SciFraudScan
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/kiwi0719/SciFraudScan/actions/workflows/ci.yml/badge.svg)](https://github.com/kiwi0719/SciFraudScan/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
+[![Agent Skill](https://img.shields.io/badge/Agent_Skill-SKILL.md-8A2BE2.svg)](SKILL.md)
+[![Release](https://img.shields.io/github/v/tag/kiwi0719/SciFraudScan?label=release)](https://github.com/kiwi0719/SciFraudScan/tags)
 
-A Claude skill for screening research data and reported statistics for
-anomaly signals: impossible means and SDs, p-values that disagree with their
-test statistics, duplicated or derived columns, digit preference, implausible
-baseline balance, and p-hacking signatures across a literature.
+**Screening signals for research data and reported statistics. Never a verdict.**
 
-SciFraudScan 是一个科研诚信筛查 skill，用于从科研数据和论文报告的统计量中发现
-异常信号。所有检查只产生**需要进一步核查的线索**，不构成对任何人的学术不端指控。
+SciFraudScan is an [Agent Skill](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
+for Claude, and a plain Python CLI. It checks research data and the numbers a
+paper prints for anomalies: means and SDs that cannot exist, p-values that
+disagree with their test statistics, duplicated or derived columns, digit
+preference, implausible baseline balance, and p-hacking signatures across a
+literature.
+
+Every check produces a **signal for further checking**, not an allegation of
+misconduct against anyone. `SKILL.md` teaches Claude to report it that way.
+
+## Contents
+
+- [Status](#status)
+- [Install](#install)
+- [Quick look](#quick-look)
+- [What it checks](#what-it-checks)
+- [Benchmark](#benchmark)
+- [Limitations](#limitations)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+
+## Status
+
+| | |
+|---|---|
+| Version | `v0.5.0` ([changelog](CHANGELOG.md)) |
+| Runs as | Claude Agent Skill (Claude Code, Claude.ai, Agent SDK); standalone CLI |
+| Needs | Python 3.10+, numpy, pandas, scipy; openpyxl only for `.xlsx` input |
+| Validated by default | GRIM, GRIMMER, reported p-value recomputation, baseline p reachability |
+| Production use | Triage only. Every flag must be checked by a person against the paper |
 
 ## Install
 
-Clone into your skills directory, then:
+### As a Claude skill
+
+Claude Code (personal skills directory; use `.claude/skills/` in a project to
+share it with a repo):
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/kiwi0719/SciFraudScan ~/.claude/skills/scifraudscan
+pip install -r ~/.claude/skills/scifraudscan/requirements.txt
 ```
 
-Claude loads `SKILL.md` and drives `scripts/scan.py` from there. It also works
-as a plain CLI:
+The directory name must be `scifraudscan`, matching `name:` in `SKILL.md`.
+Claude loads the skill when you ask it to check a paper, a table or a dataset;
+you can also call it by name with `/scifraudscan`.
+
+Claude.ai: zip the repository directory and upload it under
+*Settings → Capabilities → Skills*.
+
+### As a CLI
+
+```bash
+git clone https://github.com/kiwi0719/SciFraudScan && cd SciFraudScan
+pip install -r requirements.txt
+python scripts/scan.py --help
+```
+
+## Quick look
 
 ```bash
 python scripts/scan.py examples/fabricated_trial.csv \
   --group-column arm --time-column enrol_day \
   --reported-stats examples/reported_stats.csv \
-  --p-values examples/p_values.csv
+  --p-values examples/p_values.csv --experimental
 ```
 
 Every report carries the version that produced it, so a finding can be traced
-back to a build:
+back to a build. Run on the retracted paper in `benchmarks/real_cases/`:
 
 ```
-$ python scripts/scan.py --reported-stats table1.csv
-SciFraudScan 0.2.0
+$ python scripts/scan.py --reported-stats benchmarks/real_cases/sigirci_wansink_2015_regret/reported_stats.csv
+SciFraudScan 0.5.0
 ============================================================
 
 Input: 0 rows, 0 columns, 30 reported-statistic rows
 Result: 2 flagged, 0 clear, 1 not applicable (highest severity: high)
+Not run (input missing):
+  - baseline_p: needs --baseline-summary
 
 Reported statistics
 ------------------------------------------------------------
 [FLAG] GRIM (high)
         10 of 30 reported means cannot arise from N responses on the stated scale.
-          failures:
-            - {'row': 0, 'n': 18, 'reported_mean': 2.63, 'decimals': 2, 'reason': 'no set of n responses rounds to this mean'}
-            ... 9 more
+          ...
 [FLAG] SD Feasibility (GRIMMER / variance bounds) (high)
         8 of 20 testable mean/SD pairs are impossible; an SD is testable only
         where the mean itself is attainable.
+          ...
 [n/a]  Reported p-value Consistency
-        No row supplied a test statistic, its df and a reported p-value.
+        No row supplied a test statistic with its df (or, for Mann-Whitney U,
+        its group sizes) and a reported p-value.
 
 ------------------------------------------------------------
-These are statistical screening signals, not findings of misconduct. Every flag
-has innocent explanations and must be checked against the study's methods
-before it means anything.
+These are statistical screening signals, not findings of misconduct. ...
 ```
 
-That is real output, from the retracted paper in `benchmarks/real_cases/`.
+Input files may be `.csv`, `.tsv` or `.xlsx`. `--format json` gives the same
+result as structured data, which is what Claude reads.
 
 ## What it checks
 
@@ -73,6 +122,8 @@ That is real output, from the retracted paper in `benchmarks/real_cases/`.
 | `covariance` | Near-collinear pairs, near-singular covariance |
 | `timeseries` | Serial autocorrelation, spectral periodicity |
 | `pvalues` | Caliper test, p-curve shape, excess significance |
+| `baseline_p` | Whether each printed baseline p-value is reachable from the table's n / mean / SD |
+| `baseline_balance` | Carlisle balance of a published baseline table, against an empirical reference |
 
 The reported-statistics checks need no raw data — only the numbers printed in
 the paper — and are the only ones that can show a result is *impossible*
@@ -115,9 +166,13 @@ is the same trial with five defects planted in it.
 
 | | clean | fabricated |
 |---|---|---|
-| flagged | **0** | 14 |
-| clear | 15 | 7 |
+| flagged | **0** | 12 |
+| clear | 15 | 9 |
 | not applicable | 1 | 1 |
+
+Both run with `--experimental --group-column arm --time-column enrol_day`; the
+fabricated run also gets `examples/reported_stats.csv` and
+`examples/p_values.csv`, which account for six of its twelve flags.
 
 ```bash
 pytest                                   # includes this as a regression test
@@ -214,6 +269,22 @@ Roughly 22 checks run without correction for multiple comparisons, so some
 flags on honest data are expected — severity and the per-check failure modes
 matter far more than the count.
 
+## Documentation
+
+- [`SKILL.md`](SKILL.md): what Claude is told, including how to write results up
+- [`references/METHODOLOGY.md`](references/METHODOLOGY.md) ([简体中文](references/METHODOLOGY.zh-CN.md)):
+  every check's assumptions, minimum data, thresholds and failure modes
+- [`benchmarks/`](benchmarks/): real cases, false-positive measurement,
+  cross-check against scrutiny
+- [`CHANGELOG.md`](CHANGELOG.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: `make check` must
+be green, and a change that makes `examples/clean_trial.csv` flag is wrong.
+Security issues go through [SECURITY.md](SECURITY.md); conduct follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md).
+
 ## Citing this
 
 `CITATION.cff` has the metadata. If you use it in published work, cite the
@@ -223,4 +294,4 @@ implementation of other people's statistics.
 
 ## License
 
-MIT
+[MIT](LICENSE)

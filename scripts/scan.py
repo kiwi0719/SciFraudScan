@@ -36,7 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", action="version", version=f"scifraudscan {__version__}"
     )
-    parser.add_argument("data", nargs="?", type=Path, help="Dataset CSV to scan.")
+    parser.add_argument(
+        "data",
+        nargs="?",
+        type=Path,
+        help="Dataset to scan: .csv, .tsv or .xlsx (Excel needs openpyxl).",
+    )
     parser.add_argument(
         "--reported-stats", type=Path, help="CSV of statistics as reported in the paper."
     )
@@ -90,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             assumed_power=args.assumed_power,
             include_experimental=args.experimental,
         )
-    except (ValueError, FileNotFoundError) as error:
+    except (ValueError, FileNotFoundError, pd.errors.ParserError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
@@ -111,6 +116,17 @@ def _read(path: Path | None) -> pd.DataFrame | None:
         return None
     if not path.exists():
         raise FileNotFoundError(f"no such file: {path}")
+    suffix = path.suffix.lower()
+    if suffix in {".xlsx", ".xls"}:
+        try:
+            return pd.read_excel(path)
+        except ImportError as error:
+            raise ValueError(
+                f"{path}: reading Excel needs openpyxl (pip install openpyxl), "
+                "or export the sheet to CSV"
+            ) from error
+    if suffix in {".tsv", ".tab"}:
+        return pd.read_csv(path, sep="\t")
     return pd.read_csv(path)
 
 

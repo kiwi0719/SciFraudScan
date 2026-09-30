@@ -1,7 +1,27 @@
+# python
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
 .venv/
 venv/
+*.egg-info/
+build/
+dist/
+
+# benchmark downloads (benchmarks/false_positives/fetch_datasets.py)
 benchmarks/false_positives/rdata/
+
+# never commit data you were asked to screen
+private/
+*.private.csv
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# secrets
+.env
+.env.*

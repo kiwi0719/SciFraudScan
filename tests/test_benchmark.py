@@ -80,7 +80,10 @@ def test_the_default_run_is_the_validated_checks_only(examples_dir) -> None:
     """A raw dataset reaches no validated check, and must not silently appear clean."""
     result = scan(pd.read_csv(examples_dir / "fabricated_trial.csv"), group_column="arm")
     assert result["sections"] == []
-    assert result["summary"]["groups_run"] == ["reported_stats", "baseline_p"]
+    # neither validated group had its input, so neither ran; saying they did
+    # would read as two clean results
+    assert result["summary"]["groups_run"] == []
+    assert set(result["summary"]["groups_skipped"]) == {"reported_stats", "baseline_p"}
     assert result["summary"]["experimental_groups_run"] == []
 
     opted_in = scan(
@@ -94,6 +97,16 @@ def test_the_default_run_is_the_validated_checks_only(examples_dir) -> None:
         for s in opted_in["sections"]
         if s["group"] not in {"reported_stats", "baseline_p"}
     )
+
+
+def test_an_explicitly_named_group_without_input_is_not_applicable(examples_dir) -> None:
+    result = scan(
+        reported_stats=pd.read_csv(examples_dir / "reported_stats.csv"),
+        groups=["reported_stats", "duplication"],
+    )
+    by_group = {s["group"]: s["findings"] for s in result["sections"]}
+    assert [f["outcome"] for f in by_group["duplication"]] == ["not_applicable"]
+    assert result["summary"]["groups_run"] == ["reported_stats"]
 
 
 def test_no_aggregate_score_is_produced(clean_result) -> None:

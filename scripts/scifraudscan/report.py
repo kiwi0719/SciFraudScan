@@ -54,6 +54,12 @@ def render_text(result: dict[str, Any], show_details: bool = True) -> str:
             else ""
         )
     )
+    skipped = summary.get("groups_skipped") or {}
+    reported = {section["group"] for section in result["sections"]}
+    not_run = {g: r for g, r in skipped.items() if g not in reported}
+    if not_run:
+        lines.append("Not run (input missing):")
+        lines.extend(f"  - {group}: {reason}" for group, reason in not_run.items())
     lines.append("")
 
     if not result["sections"]:

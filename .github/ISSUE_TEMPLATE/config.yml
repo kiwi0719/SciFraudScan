@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Methodology
+    url: https://github.com/kiwi0719/SciFraudScan/blob/main/references/METHODOLOGY.md
+    about: Read a check's assumptions and failure modes before reporting it as wrong.
+  - name: Security
+    url: https://github.com/kiwi0719/SciFraudScan/security/advisories/new
+    about: Report privately. See SECURITY.md.
