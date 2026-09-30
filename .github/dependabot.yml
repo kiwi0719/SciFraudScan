@@ -6,5 +6,8 @@ updates:
     groups: { actions: { patterns: ["*"] } }
   - package-ecosystem: pip
     directory: /
+    # requirements*.txt are lower bounds for people installing the skill into
+    # their own environment; only move one when the old bound stops working
+    versioning-strategy: increase-if-necessary
     schedule: { interval: weekly }
     groups: { python: { patterns: ["*"] } }
